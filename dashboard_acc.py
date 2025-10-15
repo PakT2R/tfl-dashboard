@@ -157,7 +157,7 @@ class ACCMinimalDashboard:
                 st.markdown(f"""
                 <div class="main-header">
                     <h1>🏁 {community_name}</h1>
-                    <h3>ACC Server Dashboard</h3>
+                    <h3>by Terronia Racing</h3>
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -319,3 +319,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
