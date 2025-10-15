@@ -13,7 +13,7 @@ import base64
 
 # Configurazione pagina
 st.set_page_config(
-    page_title="ACC Server Dashboard",
+    page_title="TFL Racing Dashboard",
     page_icon="🏁",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -32,8 +32,8 @@ class ACCMinimalDashboard:
         
         default_config = {
             "community": {
-                "name": os.getenv('ACC_COMMUNITY_NAME', "[E?]nigma Overdrive"),
-                "description": os.getenv('ACC_COMMUNITY_DESC', "ACC Racing Community")
+                "name": os.getenv('ACC_COMMUNITY_NAME', "N/A"),
+                "description": os.getenv('ACC_COMMUNITY_DESC', "N/A")
             },
             "social": {
                 "discord": "",
@@ -317,4 +317,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
