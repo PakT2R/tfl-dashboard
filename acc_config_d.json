@@ -1,6 +1,6 @@
 {
     "community": {
-        "name": "TFL - TIER Friends League [ITA]",
+        "name": "TFL - TIER Friends League",
         "description": "if you see this please edit it in acc_config.json"
     },
     "social": {
@@ -10,4 +10,5 @@
     "database": {
         "path": "acc_stats.db"
     }
+
 }
