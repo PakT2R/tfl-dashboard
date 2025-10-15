@@ -1,0 +1,13 @@
+{
+    "community": {
+        "name": "TFL - TIER Friends League [ITA]",
+        "description": "if you see this please edit it in acc_config.json"
+    },
+    "social": {
+        "discord": "https://discord.gg/HRBkPehkxE",
+        "simgrid": "https://www.thesimgrid.com/communities/tfl-italia"
+    },	
+    "database": {
+        "path": "acc_stats.db"
+    }
+}
