@@ -300,7 +300,7 @@ def main():
         st.sidebar.markdown("---")
         st.sidebar.markdown(f"""
         <div style="text-align: center; color: #666; font-size: 0.8rem;">
-            <p>🏁 TFL Footer</p>
+            <p>🏁 by Terronia Racing</p>
             <p>Community: {dashboard.config['community']['name']}</p>
             <p>Version: 2.0 WIP</p>
         </div>
@@ -319,5 +319,6 @@ def main():
 if __name__ == "__main__":
 
     main()
+
 
 
