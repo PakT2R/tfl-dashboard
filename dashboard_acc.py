@@ -146,7 +146,7 @@ class ACCMinimalDashboard:
                         </h1>
                         <h3 style="margin: 0.5rem 0 0 0; font-size: 1.5rem; 
                                    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
-                            ACC Server Dashboard
+                            by Terronia Racing
                         </h3>
                     </div>
                 </div>
@@ -300,7 +300,7 @@ def main():
         st.sidebar.markdown("---")
         st.sidebar.markdown(f"""
         <div style="text-align: center; color: #666; font-size: 0.8rem;">
-            <p>🏁 ACC Server Dashboard</p>
+            <p>🏁 TFL Footer</p>
             <p>Community: {dashboard.config['community']['name']}</p>
             <p>Version: 2.0 WIP</p>
         </div>
@@ -319,4 +319,5 @@ def main():
 if __name__ == "__main__":
 
     main()
+
 
