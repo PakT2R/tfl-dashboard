@@ -1,7 +1,7 @@
 {
     "community": {
         "name": "TFL - TIER Friends League",
-        "description": "if you see this please edit it in acc_config.json"
+        "description": "by Terronia Racing"
     },
     "social": {
         "discord": "https://discord.gg/HRBkPehkxE",
@@ -12,3 +12,4 @@
     }
 
 }
+
