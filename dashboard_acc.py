@@ -1978,7 +1978,7 @@ class ACCWebDashboard:
         date_to_str = (date_to + timedelta(days=1)).strftime('%Y-%m-%d')
         
         query = '''
-            SELECT 
+            SELECT
                 s.session_id,
                 s.session_type,
                 s.track_name,
@@ -1999,12 +1999,14 @@ class ACCWebDashboard:
                     sr.best_lap
                 FROM session_results sr
                 JOIN drivers d ON sr.driver_id = d.driver_id
-                WHERE sr.best_lap = (
+                WHERE sr.best_lap > 0
+                AND sr.best_lap = (
                     SELECT MIN(sr2.best_lap)
                     FROM session_results sr2
                     WHERE sr2.session_id = sr.session_id
                     AND sr2.best_lap > 0
                 )
+                GROUP BY sr.session_id
             ) fastest ON s.session_id = fastest.session_id
             LEFT JOIN competitions c ON s.competition_id = c.competition_id
             WHERE DATE(s.session_date) >= ? AND DATE(s.session_date) < ?
@@ -3518,19 +3520,25 @@ def main():
         # Routing pagine
         if page == "🏠 Homepage":
             dashboard.show_homepage()
+        
+        elif page == "🏆 Championships Report":
+            dashboard.show_championships_report()
+        
+        elif page == "🎮 Official 4Fun Report":
+            dashboard.show_4fun_report()
+        
+        elif page == "🏁 Best Lap Report":
+            dashboard.show_best_laps_report()
 
         elif page == "🎮 Sessions Report":
             dashboard.show_sessions_report()
 
-        elif page in ["🏆 Championships Report", "🎮 Official 4Fun Report",
-                      "🏁 Best Lap Report", "👤 Drivers Report", "📊 Advanced Statistics"]:
-            st.header(f"{page}")
-            st.warning("🚧 **Work in Progress**")
-            st.info("Questa sezione è temporaneamente disabilitata durante la migrazione a TFL Manager.")
-            st.markdown("---")
-            st.markdown("### 🏁 TIER Friends League")
-            st.markdown("Il sistema è in fase di aggiornamento per supportare il nuovo formato TFL.")
-            st.markdown("Per ora sono disponibili **Homepage** e **Sessions Report**.")
+        elif page == "👤 Drivers Report":
+            dashboard.show_drivers_report()
+        
+        elif page == "📊 Advanced Statistics":
+            st.header("📊 Advanced Statistics")
+            st.info("🚧 Section under development - will be implemented soon")
         
         # Footer
         st.sidebar.markdown("---")
