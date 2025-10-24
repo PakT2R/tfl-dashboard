@@ -211,8 +211,8 @@ class ACCWebDashboard:
         }
         
         .championship-header {
-            background: linear-gradient(90deg, #d4af37, #ffd700);
-            color: #333;
+            background: linear-gradient(135deg, #2d2d2d, #1e1e1e);
+            color: white;
             padding: 1rem;
             border-radius: 8px;
             text-align: center;
@@ -220,7 +220,7 @@ class ACCWebDashboard:
         }
         
         .competition-header {
-            background: linear-gradient(90deg, #ff6b35, #ff8c42);
+            background: linear-gradient(135deg, #3d3d3d, #2a2a2a);
             color: white;
             padding: 0.8rem;
             border-radius: 6px;
@@ -323,10 +323,11 @@ class ACCWebDashboard:
             safe_queries = {
                 'total_drivers': 'SELECT COUNT(*) FROM drivers',
                 'total_competitions': 'SELECT COUNT(*) FROM competitions WHERE is_completed = 1',
-                'total_championships': 'SELECT COUNT(*) FROM championships WHERE is_completed = 1',
-                'completed_competitions': '''SELECT COUNT(*) FROM competitions 
+                'total_championships': "SELECT COUNT(*) FROM championships WHERE is_completed = 1 AND championship_type = 'standard'",
+                'completed_leagues': 'SELECT COUNT(*) FROM leagues WHERE is_completed = 1',
+                'completed_competitions': '''SELECT COUNT(*) FROM competitions
                                            WHERE is_completed = 1 AND championship_id is not null''',
-                'fun_competitions': '''SELECT COUNT(*) FROM competitions 
+                'fun_competitions': '''SELECT COUNT(*) FROM competitions
                                      WHERE championship_id IS NULL''',
             }
             
@@ -396,6 +397,7 @@ class ACCWebDashboard:
                 'total_drivers': 0,
                 'total_competitions': 0,
                 'total_championships': 0,
+                'completed_leagues': 0,
                 'completed_competitions': 0,
                 'fun_competitions': 0,
                 'last_championship_race': None,
@@ -448,351 +450,101 @@ class ACCWebDashboard:
         if not any(stats.values()):
             st.warning("⚠️ No data available in database")
             return
-        
-        # PRIMA RIGA - Layout a colonne per le metriche
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{stats['total_drivers']}</p>
-                <p class="metric-label">👥 Registered Drivers</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{stats['total_competitions']}</p>
-                <p class="metric-label">🎮 Total Competitions</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{stats['fun_competitions']:,}</p>
-                <p class="metric-label">🎉 4Fun Competitions</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            # Ultima sessione generale (non solo championship)
-            try:
-                conn = sqlite3.connect(self.db_path)
-                cursor = conn.cursor()
-                cursor.execute('SELECT MAX(session_date) FROM sessions')
-                last_general_session = cursor.fetchone()[0]
-                conn.close()
-                if last_general_session:
-                    try:
-                        last_date = datetime.fromisoformat(last_general_session.replace('Z', '+00:00'))
-                        last_session_formatted = last_date.strftime('%d/%m/%Y')
-                    except:
-                        last_session_formatted = "N/A"
-                else:
-                    last_session_formatted = "N/A"
-            except:
-                last_session_formatted = "N/A"
-            
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.4rem;">{last_session_formatted}</p>
-                <p class="metric-label">📅 Last Session Date</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # SECONDA RIGA di metriche
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{stats['total_championships']}</p>
-                <p class="metric-label">🏆 Completed Championships</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{stats['completed_competitions']}</p>
-                <p class="metric-label">🏁 Championship Competitions</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            title_holder = stats.get('title_holder', 'N/A')
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.4rem;">{title_holder}</p>
-                <p class="metric-label">🏆 Title Holder</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            # Ultima gara di campionato
-            if stats['last_championship_race']:
-                try:
-                    last_date = datetime.fromisoformat(stats['last_championship_race'].replace('Z', '+00:00'))
-                    last_race_formatted = last_date.strftime('%d/%m/%Y')
-                except:
-                    last_race_formatted = "N/A"
-            else:
-                last_race_formatted = "N/A"
-            
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.4rem;">{last_race_formatted}</p>
-                <p class="metric-label">📅 Last Championship Race</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Prossima competizione prevista
-        next_comp = stats.get('next_competition')
-        if next_comp:
-            try:
-                comp_date = pd.to_datetime(next_comp['date']).strftime('%d/%m/%Y')
-            except:
-                comp_date = next_comp['date'][:10] if next_comp['date'] and len(next_comp['date']) >= 10 else "TBD"
-            
-            # Determina il tipo di competizione
-            if next_comp['championship']:
-                comp_type = f"({next_comp['championship']})"
-            else:
-                comp_type = "(4Fun Race)"
-            
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #FF6B35, #F7931E); 
-                        color: white; padding: 20px; border-radius: 15px; margin: 25px 0; text-align: center;
-                        box-shadow: 0 8px 32px rgba(255, 107, 53, 0.3);">
-                <h3 style="margin: 0 0 10px 0; color: white; font-size: 1.8em;">🏁 NEXT RACE</h3>
-                <p style="margin: 0; font-size: 1.4em; font-weight: bold;">
-                    {next_comp['name']} • {comp_date} {comp_type}
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #6c757d, #495057); 
-                        color: white; padding: 20px; border-radius: 15px; margin: 25px 0; text-align: center;
-                        box-shadow: 0 8px 32px rgba(108, 117, 125, 0.3);">
-                <h3 style="margin: 0 0 10px 0; color: white; font-size: 1.8em;">🏁 NEXT RACE</h3>
-                <p style="margin: 0; font-size: 1.2em;">No upcoming races scheduled</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Grafici statistiche
-        st.markdown("---")
-        self.show_homepage_charts(stats)
-    
-    def show_homepage_charts(self, stats):
-        """Mostra grafici nella homepage con gestione errori migliorata"""
-        try:
-            conn = sqlite3.connect(self.db_path)
 
-            col1, col2 = st.columns(2)
+        # Testo introduttivo TFL
+        st.markdown("""<div style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 50%, #495057 100%); padding: 40px 30px; border-radius: 20px; margin: 20px 0; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3); text-align: center; color: white; border: 3px solid rgba(255, 255, 255, 0.15);">
+<p style="font-size: 2.5rem; font-weight: 900; margin: 0 0 25px 0; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4); letter-spacing: 1px; line-height: 1.2;">🏁 Corri quando vuoi • Competi sempre 🏁</p>
+<div style="background: rgba(255, 255, 255, 0.25); padding: 2px; margin: 25px auto; width: 80%; border-radius: 5px;"></div>
+<p style="font-size: 1.2rem; margin: 20px 0; font-weight: 500; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Benvenuto nella dashboard ufficiale della <strong>TFL Master Championship 01</strong></p>
+<p style="font-size: 1.1rem; margin: 25px 0 15px 0; font-weight: 600; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Usa il menu per visualizzare:</p>
+<div style="background: rgba(255, 255, 255, 0.15); padding: 20px; border-radius: 12px; margin: 20px auto; max-width: 600px; backdrop-filter: blur(10px);">
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📊 <strong>Classifiche</strong> - TIER e Generale</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">🏎️ <strong>Risultati Gare</strong> - Dettaglio sessioni</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">👤 <strong>Piloti</strong> - Statistiche personali</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📈 <strong>Analisi</strong> - Prestazioni e trend</p>
+</div>
+<div style="background: rgba(255, 255, 255, 0.25); padding: 2px; margin: 25px auto; width: 80%; border-radius: 5px;"></div>
+<p style="font-size: 1.3rem; margin: 20px 0 10px 0; font-weight: 700; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">⏰ Tutte le sere ore 23:00 • Lun-Ven</p>
+<p style="font-size: 1.1rem; margin: 15px 0 0 0; font-weight: 600; font-style: italic; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Organizzato da Terronia Racing 🏴</p>
+</div>""", unsafe_allow_html=True)
 
-            with col1:
-                st.subheader("📊 Sessions per Day")
+        # Link al regolamento
+        st.markdown("""<div style="text-align: center; margin: 25px 0;">
+<a href="https://raw.githubusercontent.com/PakT2R/tfl-dashboard/main/TIER_FRIENDS_LEAGUE_Regolamento.pdf" target="_blank" style="text-decoration: none;">
+<div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            display: inline-block; padding: 18px 50px; border-radius: 50px;
+            box-shadow: 0 6px 25px rgba(40, 167, 69, 0.4);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            cursor: pointer;">
+<p style="color: white; font-size: 1.3rem; font-weight: 700; margin: 0;
+          text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);">
+📖 Leggi il Regolamento Completo
+</p>
+</div>
+</a>
+</div>""", unsafe_allow_html=True)
 
-                # Query per sessioni per giorno (ultimi 15 giorni)
-                query_sessions = """
-                SELECT
-                    date(session_date) as day,
-                    COUNT(*) as sessions
-                FROM sessions
-                WHERE session_date IS NOT NULL
-                  AND date(session_date) >= date('now', '-15 days')
-                GROUP BY date(session_date)
-                ORDER BY day DESC
-                LIMIT 15
-                """
+        # Box unico con le statistiche principali
+        st.markdown(f"""<div style="background: linear-gradient(135deg, #1e1e1e, #2d2d2d); padding: 25px; border-radius: 15px; margin: 20px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
+<div style="text-align: center; padding: 15px;">
+<p style="font-size: 2.5rem; font-weight: bold; margin: 0; color: #dc3545;">{stats['total_drivers']}</p>
+<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">👥 Registered Drivers</p>
+</div>
+<div style="text-align: center; padding: 15px;">
+<p style="font-size: 2.5rem; font-weight: bold; margin: 0; color: #28a745;">{stats['completed_leagues']}</p>
+<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🏆 Completed Leagues</p>
+</div>
+<div style="text-align: center; padding: 15px;">
+<p style="font-size: 2.5rem; font-weight: bold; margin: 0; color: #28a745;">{stats['total_championships']}</p>
+<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🏆 Completed Championships</p>
+</div>
+<div style="text-align: center; padding: 15px;">
+<p style="font-size: 2.5rem; font-weight: bold; margin: 0; color: #28a745;">{stats['fun_competitions']}</p>
+<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🎉 4Fun Competitions</p>
+</div>
+</div>
+</div>""", unsafe_allow_html=True)
 
-                df_sessions = self.safe_sql_query(query_sessions)
-
-                if not df_sessions.empty:
-                    # Inverte l'ordine per mostrare cronologicamente (più vecchio -> più recente)
-                    df_sessions = df_sessions.sort_values('day', ascending=True)
-                    # Formatta le date per una migliore leggibilità (giorno/mese)
-                    df_sessions['day_label'] = pd.to_datetime(df_sessions['day']).dt.strftime('%d/%m')
-
-                    fig_sessions = px.bar(
-                        df_sessions,
-                        x='day_label',
-                        y='sessions',
-                        title="Sessions per Day (Last 15)",
-                        color='sessions',
-                        color_continuous_scale='blues'
-                    )
-                    fig_sessions.update_xaxes(title="Day")
-                    fig_sessions.update_layout(height=400, showlegend=False)
-                    st.plotly_chart(fig_sessions, use_container_width=True)
-                else:
-                    st.info("No data available for sessions chart")
-
-            with col2:
-                # Ottieni informazioni per il filtro
-                next_comp = stats.get('next_competition')
-                last_championship_race = stats.get('last_championship_race')
-
-                # Determina la pista e la data di inizio
-                if next_comp and next_comp.get('track'):
-                    track_name = next_comp['track']
-                    chart_title = f"{track_name} Training Sessions"
-                    caption_text = f"🏁 Activity on {track_name}"
-                else:
-                    track_name = None
-                    chart_title = "Most Active Drivers"
-                    caption_text = "🗓️ General activity"
-
-                # Determina la data di inizio - usa ultima sessione ufficiale
-                try:
-                    query_last_official = "SELECT MAX(session_date) FROM sessions WHERE competition_id IS NOT NULL"
-                    df_last_official = self.safe_sql_query(query_last_official)
-                    if not df_last_official.empty and df_last_official.iloc[0, 0]:
-                        start_date = df_last_official.iloc[0, 0]
-                        try:
-                            # Formatta la data per visualizzazione nella caption
-                            start_date_obj = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                            start_date_formatted = start_date_obj.strftime('%d/%m/%Y')
-                            caption_text += f" since {start_date_formatted}"
-                        except:
-                            pass
-                    else:
-                        start_date = None
-                except:
-                    start_date = None
-
-                st.subheader("👥 Most Active Drivers")
-                st.caption(caption_text)
-
-                # Query per piloti più attivi sulla pista specifica
-                if track_name and start_date:
-                    query_active = """
-                    SELECT
-                        d.last_name as driver,
-                        COUNT(DISTINCT l.session_id) as sessions
-                    FROM drivers d
-                    JOIN laps l ON d.driver_id = l.driver_id
-                    JOIN sessions s ON l.session_id = s.session_id
-                    WHERE s.track_name = ?
-                      AND date(s.session_date) > date(?)
-                      AND date(s.session_date) <= date('now')
-                    GROUP BY d.driver_id, d.last_name
-                    HAVING sessions > 0
-                    ORDER BY sessions DESC
-                    LIMIT 10
-                    """
-                    df_active = self.safe_sql_query(query_active, (track_name, start_date))
-                elif track_name:
-                    # Solo filtro per pista, senza data
-                    query_active = """
-                    SELECT
-                        d.last_name as driver,
-                        COUNT(DISTINCT l.session_id) as sessions
-                    FROM drivers d
-                    JOIN laps l ON d.driver_id = l.driver_id
-                    JOIN sessions s ON l.session_id = s.session_id
-                    WHERE s.track_name = ?
-                      AND date(s.session_date) >= date('now', '-30 days')
-                      AND date(s.session_date) <= date('now')
-                    GROUP BY d.driver_id, d.last_name
-                    HAVING sessions > 0
-                    ORDER BY sessions DESC
-                    LIMIT 10
-                    """
-                    df_active = self.safe_sql_query(query_active, (track_name,))
-                else:
-                    # Fallback alla query originale se non ci sono informazioni
-                    query_active = """
-                    SELECT
-                        d.last_name as driver,
-                        COUNT(DISTINCT l.session_id) as sessions
-                    FROM drivers d
-                    JOIN laps l ON d.driver_id = l.driver_id
-                    JOIN sessions s ON l.session_id = s.session_id
-                    WHERE date(s.session_date) >= date('now', '-14 days')
-                      AND date(s.session_date) <= date('now')
-                    GROUP BY d.driver_id, d.last_name
-                    HAVING sessions > 0
-                    ORDER BY sessions DESC
-                    LIMIT 10
-                    """
-                    df_active = self.safe_sql_query(query_active)
-
-                if not df_active.empty:
-                    # Ordina per visualizzazione orizzontale
-                    df_active = df_active.sort_values('sessions', ascending=True)
-
-                    fig_active = px.bar(
-                        df_active,
-                        x='sessions',
-                        y='driver',
-                        orientation='h',
-                        title=chart_title,
-                        color='sessions',
-                        color_continuous_scale='greens'
-                    )
-                    fig_active.update_layout(height=400, showlegend=False)
-
-                    # Aggiorna il titolo dell'asse X
-                    if track_name:
-                        x_title = f"Training Sessions on {track_name}"
-                    else:
-                        x_title = "Sessions"
-
-                    fig_active.update_xaxes(title=x_title)
-                    fig_active.update_yaxes(title="Driver")
-                    st.plotly_chart(fig_active, use_container_width=True)
-                else:
-                    if track_name:
-                        st.info(f"No training activity found on {track_name}")
-                    else:
-                        st.info("No recent activity data available")
-
-            conn.close()
-
-        except Exception as e:
-            st.error(f"❌ Errore nel caricamento grafici: {e}")
-    
     # [Tutte le altre funzioni rimangono identiche]
     def get_championships_list(self) -> List[Tuple]:
-        """Ottiene lista campionati ordinati per data di inizio discendente"""
+        """Ottiene lista campionati standard ordinati per data di inizio discendente"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            
+
             cursor.execute("""
-                SELECT 
-                    championship_id, 
-                    name, 
-                    season, 
-                    start_date, 
+                SELECT
+                    championship_id,
+                    name,
+                    season,
+                    start_date,
                     end_date,
                     is_completed,
                     description
-                FROM championships 
-                ORDER BY 
+                FROM championships
+                WHERE championship_type = 'standard'
+                ORDER BY
                     is_completed ASC,
                     CASE WHEN end_date IS NULL THEN 1 ELSE 0 END,
                     end_date DESC,
                     championship_id DESC
             """)
-            
+
             championships = cursor.fetchall()
             conn.close()
-            
+
             return championships
-            
+
         except Exception as e:
             st.error(f"❌ Errore nel recupero campionati: {e}")
             return []
     
     def get_championship_standings(self, championship_id: int) -> pd.DataFrame:
-        """Ottiene classifica campionato"""
+        """Ottiene classifica campionato con tutti i dettagli"""
         query = """
-            SELECT 
+            SELECT
                 cs.position,
                 d.last_name as driver,
                 cs.total_points,
@@ -801,13 +553,21 @@ class ACCWebDashboard:
                 cs.podiums,
                 cs.poles,
                 cs.fastest_laps,
+                cs.gross_points,
                 cs.points_dropped,
-                cs.average_position,
-                cs.best_position,
-                cs.consistency_rating
+                cs.base_points,
+                cs.participation_multiplier,
+                cs.participation_bonus,
+                COALESCE(SUM(CASE WHEN mp.is_active = 1 THEN mp.penalty_points ELSE 0 END), 0) as manual_penalties
             FROM championship_standings cs
             JOIN drivers d ON cs.driver_id = d.driver_id
+            LEFT JOIN manual_penalties mp ON cs.championship_id = mp.championship_id
+                AND cs.driver_id = mp.driver_id AND mp.is_active = 1
             WHERE cs.championship_id = ?
+            GROUP BY cs.championship_id, cs.driver_id, cs.position, d.last_name,
+                     cs.total_points, cs.competitions_participated, cs.wins, cs.podiums,
+                     cs.poles, cs.fastest_laps, cs.gross_points, cs.points_dropped,
+                     cs.base_points, cs.participation_multiplier, cs.participation_bonus
             ORDER BY cs.position
         """
         
@@ -882,38 +642,24 @@ class ACCWebDashboard:
             return []
     
     def get_competition_results(self, competition_id: int) -> pd.DataFrame:
-        """Ottiene risultati competizione - AGGIORNATO per nuova struttura"""
+        """Ottiene risultati competizione con dettagli completi"""
         query = """
-            SELECT 
+            SELECT
                 d.last_name as driver,
-                cr.race_points,
-                cr.pole_points,
-                cr.fastest_lap_points,
-                cr.bonus_points,
-                cr.penalty_points,
-                cr.total_points,
-                -- Posizione in qualifica (dalle session results)
-                (SELECT csr.position 
-                 FROM competition_session_results csr 
-                 WHERE csr.competition_id = cr.competition_id 
-                 AND csr.driver_id = cr.driver_id 
-                 AND csr.session_type LIKE '%Q%' 
-                 ORDER BY csr.session_type DESC 
-                 LIMIT 1) as qualifying_position,
-                -- Posizione in gara (dalle session results)
-                (SELECT csr.position 
-                 FROM competition_session_results csr 
-                 WHERE csr.competition_id = cr.competition_id 
-                 AND csr.driver_id = cr.driver_id 
-                 AND csr.session_type LIKE '%R%' 
-                 ORDER BY csr.session_type DESC 
-                 LIMIT 1) as position
-            FROM competition_results cr
-            JOIN drivers d ON cr.driver_id = d.driver_id
-            WHERE cr.competition_id = ?
-            ORDER BY cr.total_points DESC, cr.race_points DESC
+                cs.race_points,
+                cs.pole_points,
+                cs.fastest_lap_points,
+                cs.points_bonus,
+                cs.points_dropped,
+                cs.total_points,
+                cs.guests_beaten,
+                cs.beaten_by_guests
+            FROM competition_standings cs
+            JOIN drivers d ON cs.driver_id = d.driver_id
+            WHERE cs.competition_id = ?
+            ORDER BY cs.total_points DESC, cs.race_points DESC
         """
-        
+
         return self.safe_sql_query(query, [competition_id])
     
     def get_competition_sessions(self, competition_id: int) -> List[Tuple]:
@@ -1001,7 +747,7 @@ class ACCWebDashboard:
     
     def show_4fun_report(self):
         """Mostra il report competizioni 4Fun"""
-        st.header("🎮 Report Official 4Fun")
+        st.header("🎉 Official 4Fun")
         
         # Ottieni lista competizioni 4Fun
         competitions = self.get_4fun_competitions_list()
@@ -1257,9 +1003,165 @@ class ACCWebDashboard:
             else:
                 st.info("Insufficient data for performance chart")
 
+    def show_leagues_report(self):
+        """Mostra il report leagues"""
+        st.header("🌟 Leagues")
+
+        # Ottieni lista leagues
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT
+                    league_id,
+                    name,
+                    season,
+                    start_date,
+                    end_date,
+                    total_tiers,
+                    is_completed,
+                    description
+                FROM leagues
+                ORDER BY
+                    is_completed ASC,
+                    CASE WHEN end_date IS NULL THEN 1 ELSE 0 END,
+                    end_date DESC,
+                    league_id DESC
+            """)
+
+            leagues = cursor.fetchall()
+            conn.close()
+
+            if not leagues:
+                st.warning("❌ No leagues found in database")
+                return
+
+            # Prepara opzioni per selectbox
+            league_options = []
+            league_map = {}
+
+            for league_id, name, season, start_date, end_date, total_tiers, is_completed, description in leagues:
+                # Formato display
+                status = "✅ Completed" if is_completed else "🏁 In Progress"
+                display_name = f"{name} - {season} ({status})"
+                league_options.append(display_name)
+                league_map[display_name] = league_id
+
+            # Selectbox league
+            selected_league_display = st.selectbox(
+                "Select a League:",
+                league_options,
+                key="league_selector"
+            )
+
+            selected_league_id = league_map[selected_league_display]
+
+            # Ottieni dettagli league selezionata
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT name, season, start_date, end_date, total_tiers, is_completed, description
+                FROM leagues
+                WHERE league_id = ?
+            """, (selected_league_id,))
+
+            league_info = cursor.fetchone()
+
+            if league_info:
+                name, season, start_date, end_date, total_tiers, is_completed, description = league_info
+
+                # Info league
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Season", season)
+                with col2:
+                    st.metric("Total Tiers", total_tiers)
+                with col3:
+                    status_display = "Completed ✅" if is_completed else "In Progress 🏁"
+                    st.metric("Status", status_display)
+                with col4:
+                    if start_date and end_date:
+                        try:
+                            start = datetime.fromisoformat(start_date.replace('Z', '+00:00')).strftime('%d/%m/%Y')
+                            end = datetime.fromisoformat(end_date.replace('Z', '+00:00')).strftime('%d/%m/%Y')
+                            st.metric("Period", f"{start} - {end}")
+                        except:
+                            st.metric("Period", "N/A")
+
+                if description:
+                    st.info(f"ℹ️ {description}")
+
+                st.markdown("---")
+
+                # Classifica league
+                st.subheader("📊 League Standings")
+
+                query_standings = """
+                    SELECT
+                        ls.position,
+                        d.last_name as driver,
+                        ls.tier1_points,
+                        ls.tier2_points,
+                        ls.tier3_points,
+                        ls.tier4_points,
+                        ls.total_final_points,
+                        ls.consistency_bonus,
+                        ls.tiers_participated,
+                        ls.total_wins,
+                        ls.total_podiums
+                    FROM league_standings ls
+                    JOIN drivers d ON ls.driver_id = d.driver_id
+                    WHERE ls.league_id = ?
+                    ORDER BY ls.position ASC
+                """
+
+                df_standings = pd.read_sql_query(query_standings, conn, params=(selected_league_id,))
+
+                if not df_standings.empty:
+                    # Formatta colonne
+                    df_display = df_standings.copy()
+                    df_display['position'] = df_display['position'].astype(int)
+
+                    # Rinomina colonne
+                    df_display.columns = ['Pos', 'Driver', 'Tier 1', 'Tier 2', 'Tier 3', 'Tier 4',
+                                         'Total Points', 'Consistency', 'Tiers', 'Wins', 'Podiums']
+
+                    # Mostra tabella
+                    st.dataframe(
+                        df_display,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    # Grafico top 10
+                    if len(df_display) > 0:
+                        st.subheader("📈 Top 10 Drivers")
+                        top_10 = df_display.head(10)
+
+                        fig = px.bar(
+                            top_10,
+                            x='Total Points',
+                            y='Driver',
+                            orientation='h',
+                            title=f"Top 10 Drivers - {name}",
+                            color='Total Points',
+                            color_continuous_scale='Blues'
+                        )
+                        fig.update_layout(height=500, yaxis={'categoryorder':'total ascending'})
+                        st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("No standings available for this league yet")
+
+            conn.close()
+
+        except Exception as e:
+            st.error(f"❌ Error loading leagues: {e}")
+
     def show_championships_report(self):
         """Mostra il report campionati"""
-        st.header("🏆 Championships Report")
+        st.header("🏆 Championships")
         
         # Ottieni lista campionati
         championships = self.get_championships_list()
@@ -1323,53 +1225,9 @@ class ACCWebDashboard:
                     header_html += f"<p>📅 {start_date} - {end_date}</p>"
                 
                 header_html += "</div>"
-                
+
                 st.markdown(header_html, unsafe_allow_html=True)
-                
-                # Calendario gare
-                st.subheader("📅 Race Calendar")
-                competitions = self.get_championship_competitions_calendar(championship_id)
-                
-                if competitions:
-                    # Prepara i dati per il calendario
-                    calendar_data = []
-                    for comp in competitions:
-                        competition_id, name, track, round_number, date_start, date_end, weekend_format, is_completed = comp
-                        
-                        # Formatta la data evento
-                        event_date = "TBD"
-                        if date_start:
-                            try:
-                                event_date = pd.to_datetime(date_start).strftime("%d/%m/%Y")
-                            except:
-                                event_date = date_start[:10] if len(date_start) >= 10 else date_start
-                        
-                        # Stato della gara
-                        status = "✅ Completed" if is_completed else "🔄 Scheduled"
-                        
-                        calendar_data.append({
-                            "Event Date": event_date,
-                            "Round": f"R{round_number}" if round_number else "N/A",
-                            "Competition Name": name,
-                            "Track": track if track else "TBD",
-                            "Status": status
-                        })
-                    
-                    # Crea DataFrame per il calendario
-                    calendar_df = pd.DataFrame(calendar_data)
-                    
-                    # Mostra tabella calendario
-                    st.dataframe(
-                        calendar_df,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=300
-                    )
-                else:
-                    st.info("📅 No races scheduled for this championship")
-                
-                st.divider()
-                
+
                 # Classifica campionato
                 st.subheader("📊 Championship Leaderboard")
                 standings_df = self.get_championship_standings(championship_id)
@@ -1377,33 +1235,50 @@ class ACCWebDashboard:
                 if not standings_df.empty:
                     # Formatta classifica per visualizzazione
                     standings_display = standings_df.copy()
-                    
+
                     # Aggiungi medaglie per primi 3
                     standings_display['Pos'] = standings_display['position'].apply(
                         lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
                     )
-                    
-                    # Seleziona colonne da mostrare
+
+                    # Formatta i valori numerici
+                    standings_display['total_points'] = standings_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                    standings_display['gross_points'] = standings_display['gross_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                    standings_display['points_dropped'] = standings_display['points_dropped'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "")
+                    standings_display['base_points'] = standings_display['base_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                    standings_display['participation_multiplier'] = standings_display['participation_multiplier'].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "1.00")
+                    standings_display['participation_bonus'] = standings_display['participation_bonus'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "")
+                    standings_display['manual_penalties'] = standings_display['manual_penalties'].apply(lambda x: f"-{x:.0f}" if pd.notna(x) and x > 0 else "")
+
+                    # Seleziona colonne da mostrare nell'ordine richiesto
                     columns_to_show = [
-                        'Pos', 'driver', 'total_points', 'competitions_participated', 
-                        'wins', 'podiums', 'poles', 'fastest_laps'
+                        'Pos', 'driver', 'total_points', 'competitions_participated',
+                        'wins', 'podiums', 'poles', 'fastest_laps',
+                        'gross_points', 'points_dropped', 'base_points',
+                        'participation_multiplier', 'participation_bonus', 'manual_penalties'
                     ]
-                    
-                    # Rinomina colonne
+
+                    # Rinomina colonne con i nomi corti
                     column_names = {
                         'Pos': 'Pos',
-                        'driver': 'Driver',
-                        'total_points': 'Points',
-                        'competitions_participated': 'Competitions',
-                        'wins': 'Wins',
-                        'podiums': 'Podiums',
-                        'poles': 'Poles',
-                        'fastest_laps': 'Fast Laps'
+                        'driver': 'Pilota',
+                        'total_points': 'Punti',
+                        'competitions_participated': 'Gare',
+                        'wins': 'Vitt',
+                        'podiums': 'Podi',
+                        'poles': 'Pole',
+                        'fastest_laps': 'FL',
+                        'gross_points': 'Lordo',
+                        'points_dropped': 'Drop',
+                        'base_points': 'Base',
+                        'participation_multiplier': 'Molt',
+                        'participation_bonus': 'Bonus',
+                        'manual_penalties': 'Pen'
                     }
-                    
+
                     standings_display = standings_display[columns_to_show]
                     standings_display.columns = [column_names[col] for col in columns_to_show]
-                    
+
                     # Mostra tabella senza indice e con altezza fissa
                     st.dataframe(
                         standings_display,
@@ -1411,46 +1286,7 @@ class ACCWebDashboard:
                         hide_index=True,
                         height=400
                     )
-                    
-                    # Grafici classifica
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        # Grafico vittorie in campionato
-                        wins_data = standings_df[standings_df['wins'] > 0]
-                        if not wins_data.empty:
-                            # Ordina per numero di vittorie (crescente per il grafico)
-                            wins_data = wins_data.sort_values('wins', ascending=True)
-                            
-                            fig_wins = px.bar(
-                                wins_data,
-                                x='wins',
-                                y='driver',
-                                orientation='h',
-                                title="Wins by Driver in Championship",
-                                color='wins',
-                                color_continuous_scale='reds'
-                            )
-                            fig_wins.update_layout(height=400, showlegend=False)
-                            st.plotly_chart(fig_wins, use_container_width=True)
-                        else:
-                            st.info("No wins recorded yet")
-                    
-                    with col2:
-                        # Grafico distribuzione podi
-                        podiums_data = standings_df[standings_df['podiums'] > 0]
-                        if not podiums_data.empty:
-                            fig_podiums = px.pie(
-                                podiums_data,
-                                names='driver',
-                                values='podiums',
-                                title="Podium Distribution"
-                            )
-                            fig_podiums.update_layout(height=400)
-                            st.plotly_chart(fig_podiums, use_container_width=True)
-                        else:
-                            st.info("No podium recorded yet")
-                
+
                 else:
                     st.warning("⚠️ Championship leaderboard not yet calculated")
                 
@@ -1520,37 +1356,51 @@ class ACCWebDashboard:
         # Risultati competizione
         st.subheader("🏆 Competition Leaderboard")
         results_df = self.get_competition_results(competition_id)
-        
+
         if not results_df.empty:
-            # Formatta risultati per visualizzazione - AGGIORNATO
+            # Formatta risultati per visualizzazione
             results_display = results_df.copy()
-            
+
             # Aggiungi posizione basata sull'ordine (già ordinato per punti nella query)
             results_display['Pos'] = range(1, len(results_display) + 1)
             results_display['Pos'] = results_display['Pos'].apply(
                 lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
             )
-            
-            # Seleziona e rinomina colonne - SOLO CAMPI RICHIESTI
+
+            # Formatta i valori numerici - mostra solo se > 0, altrimenti "-"
+            results_display['race_points'] = results_display['race_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
+            results_display['pole_points'] = results_display['pole_points'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "0")
+            results_display['fastest_lap_points'] = results_display['fastest_lap_points'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "0")
+            results_display['points_bonus'] = results_display['points_bonus'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
+            results_display['points_dropped'] = results_display['points_dropped'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
+            results_display['total_points'] = results_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+            results_display['guests_beaten'] = results_display['guests_beaten'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "-")
+            results_display['beaten_by_guests'] = results_display['beaten_by_guests'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "-")
+
+            # Seleziona colonne da mostrare nell'ordine richiesto
             columns_to_show = [
-                'Pos', 'driver', 'race_points', 'pole_points', 
-                'fastest_lap_points', 'bonus_points', 'penalty_points', 'total_points'
+                'Pos', 'driver', 'race_points', 'pole_points',
+                'fastest_lap_points', 'points_bonus', 'points_dropped',
+                'total_points', 'guests_beaten', 'beaten_by_guests'
             ]
-            
+
+            # Rinomina colonne con i nomi corti
             column_names = {
                 'Pos': 'Pos',
-                'driver': 'Driver',
-                'race_points': 'Race Points',
-                'pole_points': 'Pole Points',
-                'fastest_lap_points': 'Fast Lap Points',
-                'bonus_points': 'Bonus Points',
-                'penalty_points': 'Penalty Points',
-                'total_points': 'Total Points'
+                'driver': 'Pilota',
+                'race_points': 'Gara',
+                'pole_points': 'Pole',
+                'fastest_lap_points': 'FL',
+                'points_bonus': 'Bonus',
+                'points_dropped': 'Drop',
+                'total_points': 'Tot',
+                'guests_beaten': 'G+',
+                'beaten_by_guests': 'G-'
             }
-            
+
             results_display = results_display[columns_to_show]
             results_display.columns = [column_names[col] for col in columns_to_show]
-            
+
             st.dataframe(
                 results_display,
                 use_container_width=True,
@@ -1633,7 +1483,7 @@ class ACCWebDashboard:
             
     def show_sessions_report(self):
         """Mostra il report Sessions con filtri e statistiche"""
-        st.header("🎮 Sessions Report")
+        st.header("📅 Sessions")
         
         # Calcola date di default (ultima settimana)
         today = datetime.now().date()
@@ -2280,7 +2130,7 @@ class ACCWebDashboard:
 
     def show_best_laps_report(self):
         """Mostra il report Best Laps per pista"""
-        st.header("🏁 Report Best Laps")
+        st.header("⚡ Best Laps")
 
         # Ottieni lista piste
         tracks = self.get_tracks_list()
@@ -2897,7 +2747,7 @@ class ACCWebDashboard:
 
     def show_drivers_report(self):
         """Mostra il report Drivers con selezione generale o per pilota specifico"""
-        st.header("👤 Drivers Report")
+        st.header("👥 Drivers")
         
         # Ottieni lista piloti
         drivers = self.get_drivers_list()
@@ -3508,36 +3358,40 @@ def main():
             "Select page:",
             [
                 "🏠 Homepage",
-                "🏆 Championships Report",
-                "🎮 Official 4Fun Report",
-                "🏁 Best Lap Report",
-                "🎮 Sessions Report",
-                "👤 Drivers Report",
-                "📊 Advanced Statistics"
+                "🌟 Leagues",
+                "🏆 Championships",
+                "🎉 Official 4Fun",
+                "⚡ Best Lap",
+                "📅 Sessions",
+                "👥 Drivers",
+                "📈 Statistics"
             ]
         )
-        
+
         # Routing pagine
         if page == "🏠 Homepage":
             dashboard.show_homepage()
-        
-        elif page == "🏆 Championships Report":
+
+        elif page == "🌟 Leagues":
+            dashboard.show_leagues_report()
+
+        elif page == "🏆 Championships":
             dashboard.show_championships_report()
-        
-        elif page == "🎮 Official 4Fun Report":
+
+        elif page == "🎉 Official 4Fun":
             dashboard.show_4fun_report()
-        
-        elif page == "🏁 Best Lap Report":
+
+        elif page == "⚡ Best Lap":
             dashboard.show_best_laps_report()
 
-        elif page == "🎮 Sessions Report":
+        elif page == "📅 Sessions":
             dashboard.show_sessions_report()
 
-        elif page == "👤 Drivers Report":
+        elif page == "👥 Drivers":
             dashboard.show_drivers_report()
-        
-        elif page == "📊 Advanced Statistics":
-            st.header("📊 Advanced Statistics")
+
+        elif page == "📈 Statistics":
+            st.header("📈 Statistics")
             st.info("🚧 Section under development - will be implemented soon")
         
         # Footer
