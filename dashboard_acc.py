@@ -2844,7 +2844,31 @@ class ACCWebDashboard:
             index=0,  # Riepilogo generale selezionato di default
             key="driver_select"
         )
-        
+
+        # Box informativo per piloti registrati con link social
+        social_config = self.config.get('social', {})
+        discord_url = social_config.get('discord', '')
+        simgrid_url = social_config.get('simgrid', '')
+
+        # Crea i link ai social in stile discreto
+        social_links = []
+        if simgrid_url:
+            social_links.append(f'<a href="{simgrid_url}" target="_blank" style="text-decoration: none; margin: 0 0.5rem;"><button style="background: #4a90e2; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.9rem; cursor: pointer; transition: opacity 0.2s;">🏆 SimGrid</button></a>')
+        if discord_url:
+            social_links.append(f'<a href="{discord_url}" target="_blank" style="text-decoration: none; margin: 0 0.5rem;"><button style="background: #7289da; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.9rem; cursor: pointer; transition: opacity 0.2s;">💬 Discord</button></a>')
+
+        if social_links:
+            st.markdown(f"""
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 3px solid #6c757d; margin: 1rem 0;">
+                <p style="color: #495057; margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 500;">
+                    ℹ️ Only registered drivers shown - Join the TFL by registering on SimGrid or joining our Discord server
+                </p>
+                <div style="text-align: center; margin-top: 0.8rem;">
+                    {''.join(social_links)}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
         if selected_driver == "📊 General Summary":
             # Mostra riepilogo generale di tutti i piloti
             st.markdown("---")
@@ -2868,7 +2892,8 @@ class ACCWebDashboard:
             query = '''
                 SELECT DISTINCT d.driver_id, d.last_name, d.short_name
                 FROM drivers d
-                WHERE EXISTS (
+                WHERE d.trust_level > 0
+                AND EXISTS (
                     SELECT 1 FROM laps l WHERE l.driver_id = d.driver_id
                 )
                 ORDER BY LOWER(d.last_name)
@@ -2989,7 +3014,8 @@ class ACCWebDashboard:
                 )
                 GROUP BY l.driver_id
             ) records ON d.driver_id = records.driver_id
-            WHERE EXISTS (
+            WHERE d.trust_level > 0
+            AND EXISTS (
                 SELECT 1 FROM laps l WHERE l.driver_id = d.driver_id
             )
             ORDER BY d.last_name
