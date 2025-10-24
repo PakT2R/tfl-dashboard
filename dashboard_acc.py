@@ -321,12 +321,10 @@ class ACCWebDashboard:
             
             # Query sicure con gestione errori
             safe_queries = {
-                'total_drivers': 'SELECT COUNT(*) FROM drivers',
-                'total_competitions': 'SELECT COUNT(*) FROM competitions WHERE is_completed = 1',
-                'total_championships': "SELECT COUNT(*) FROM championships WHERE is_completed = 1 AND championship_type = 'standard'",
-                'completed_leagues': 'SELECT COUNT(*) FROM leagues WHERE is_completed = 1',
-                'completed_competitions': '''SELECT COUNT(*) FROM competitions
-                                           WHERE is_completed = 1 AND championship_id is not null''',
+                'total_drivers': 'SELECT COUNT(*) FROM drivers WHERE trust_level > 0',
+                'guest_drivers': 'SELECT COUNT(*) FROM drivers WHERE trust_level = 0',
+                'total_leagues': 'SELECT COUNT(*) FROM leagues',
+                'total_championships': "SELECT COUNT(*) FROM championships WHERE championship_type = 'standard'",
                 'fun_competitions': '''SELECT COUNT(*) FROM competitions
                                      WHERE championship_id IS NULL''',
             }
@@ -453,15 +451,15 @@ class ACCWebDashboard:
 
         # Testo introduttivo TFL
         st.markdown("""<div style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 50%, #495057 100%); padding: 40px 30px; border-radius: 20px; margin: 20px 0; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3); text-align: center; color: white; border: 3px solid rgba(255, 255, 255, 0.15);">
-<p style="font-size: 2.5rem; font-weight: 900; margin: 0 0 25px 0; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4); letter-spacing: 1px; line-height: 1.2;">🏁 Corri quando vuoi • Competi sempre 🏁</p>
+<p style="font-size: 2.5rem; font-weight: 900; margin: 0 0 25px 0; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4); letter-spacing: 1px; line-height: 1.2;">🏁 Corri quando vuoi, competi sempre 🏁</p>
 <div style="background: rgba(255, 255, 255, 0.25); padding: 2px; margin: 25px auto; width: 80%; border-radius: 5px;"></div>
-<p style="font-size: 1.2rem; margin: 20px 0; font-weight: 500; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Benvenuto nella dashboard ufficiale della <strong>TFL Master Championship 01</strong></p>
+<p style="font-size: 1.2rem; margin: 20px 0; font-weight: 500; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Benvenuto nella dashboard ufficiale della <strong>Tier Friends League</strong></p>
 <p style="font-size: 1.1rem; margin: 25px 0 15px 0; font-weight: 600; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Usa il menu per visualizzare:</p>
 <div style="background: rgba(255, 255, 255, 0.15); padding: 20px; border-radius: 12px; margin: 20px auto; max-width: 600px; backdrop-filter: blur(10px);">
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📊 <strong>Classifiche</strong> - TIER e Generale</p>
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">🏎️ <strong>Risultati Gare</strong> - Dettaglio sessioni</p>
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">👤 <strong>Piloti</strong> - Statistiche personali</p>
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📈 <strong>Analisi</strong> - Prestazioni e trend</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📊 <strong>Classifiche e RIsultati</strong> - Leagues, Championships e 4Fun</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">🏎️ <strong>Gare Occasionali Quotidiane</strong> - Sessions</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">👤 <strong>Informazioni Piloti</strong> - Drivers</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📈 <strong>Migliori Tempi Registrati</strong> - Best Laps</p>
 </div>
 <div style="background: rgba(255, 255, 255, 0.25); padding: 2px; margin: 25px auto; width: 80%; border-radius: 5px;"></div>
 <p style="font-size: 1.3rem; margin: 20px 0 10px 0; font-weight: 700; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">⏰ Tutte le sere ore 23:00 • Lun-Ven</p>
@@ -479,7 +477,7 @@ class ACCWebDashboard:
             cursor: pointer;">
 <p style="color: white; font-size: 1.3rem; font-weight: 700; margin: 0;
           text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);">
-📖 Leggi il Regolamento Completo
+📖 Leggi il Regolamento TFL Completo
 </p>
 </div>
 </a>
@@ -487,22 +485,26 @@ class ACCWebDashboard:
 
         # Box unico con le statistiche principali
         st.markdown(f"""<div style="background: linear-gradient(135deg, #1e1e1e, #2d2d2d); padding: 25px; border-radius: 15px; margin: 20px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
-<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;">
-<div style="text-align: center; padding: 15px;">
-<p style="font-size: 2.5rem; font-weight: bold; margin: 0; color: #dc3545;">{stats['total_drivers']}</p>
+<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;">
+<div style="text-align: center; padding: 10px;">
+<p style="font-size: 1.8rem; font-weight: bold; margin: 0; color: #dc3545;">{stats['total_drivers']}</p>
 <p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">👥 Registered Drivers</p>
 </div>
-<div style="text-align: center; padding: 15px;">
-<p style="font-size: 2.5rem; font-weight: bold; margin: 0; color: #28a745;">{stats['completed_leagues']}</p>
-<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🏆 Completed Leagues</p>
+<div style="text-align: center; padding: 10px;">
+<p style="font-size: 1.8rem; font-weight: bold; margin: 0; color: #4a90e2;">{stats['guest_drivers']}</p>
+<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">👻 Guest Drivers</p>
 </div>
-<div style="text-align: center; padding: 15px;">
-<p style="font-size: 2.5rem; font-weight: bold; margin: 0; color: #28a745;">{stats['total_championships']}</p>
-<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🏆 Completed Championships</p>
+<div style="text-align: center; padding: 10px;">
+<p style="font-size: 1.8rem; font-weight: bold; margin: 0; color: #28a745;">{stats['total_leagues']}</p>
+<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🌟 Leagues</p>
 </div>
-<div style="text-align: center; padding: 15px;">
-<p style="font-size: 2.5rem; font-weight: bold; margin: 0; color: #28a745;">{stats['fun_competitions']}</p>
-<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🎉 4Fun Competitions</p>
+<div style="text-align: center; padding: 10px;">
+<p style="font-size: 1.8rem; font-weight: bold; margin: 0; color: #28a745;">{stats['total_championships']}</p>
+<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🏆 Championships</p>
+</div>
+<div style="text-align: center; padding: 10px;">
+<p style="font-size: 1.8rem; font-weight: bold; margin: 0; color: #28a745;">{stats['fun_competitions']}</p>
+<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🎉 4Fun</p>
 </div>
 </div>
 </div>""", unsafe_allow_html=True)
@@ -833,18 +835,18 @@ class ACCWebDashboard:
             
             # Seleziona e rinomina colonne - SOLO CAMPI RICHIESTI
             columns_to_show = [
-                'Pos', 'driver', 'race_points', 'pole_points', 
-                'fastest_lap_points', 'bonus_points', 'penalty_points', 'total_points'
+                'Pos', 'driver', 'race_points', 'pole_points',
+                'fastest_lap_points', 'points_bonus', 'points_dropped', 'total_points'
             ]
-            
+
             column_names = {
                 'Pos': 'Pos',
                 'driver': 'Driver',
                 'race_points': 'Race Points',
                 'pole_points': 'Pole Points',
                 'fastest_lap_points': 'Fast Lap Points',
-                'bonus_points': 'Bonus Points',
-                'penalty_points': 'Penalty Points',
+                'points_bonus': 'Bonus Points',
+                'points_dropped': 'Penalty Points',
                 'total_points': 'Total Points'
             }
             
@@ -856,10 +858,7 @@ class ACCWebDashboard:
                 use_container_width=True,
                 hide_index=True
             )
-            
-            # Grafici specifici per 4Fun
-            self.show_4fun_charts(results_df)
-            
+
         else:
             st.warning("⚠️ 4Fun competition results not yet calculated")
         
@@ -935,74 +934,6 @@ class ACCWebDashboard:
         else:
             st.warning("❌ No sessions found for this 4Fun competition")
     
-    def show_4fun_charts(self, results_df: pd.DataFrame):
-        """Shows specific charts for 4Fun competitions"""
-        if results_df.empty:
-            return
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("📊 4Fun Points Distribution")
-            
-            # Total points chart (only drivers with points > 0)
-            points_data = results_df[results_df['total_points'] > 0].copy()
-            if not points_data.empty:
-                # Sort for horizontal display
-                points_data = points_data.sort_values('total_points', ascending=True)
-                
-                fig_points = px.bar(
-                    points_data,
-                    x='total_points',
-                    y='driver',
-                    orientation='h',
-                    title="Total Points per Driver",
-                    color='total_points',
-                    color_continuous_scale='viridis'
-                )
-                fig_points.update_layout(height=400, showlegend=False)
-                st.plotly_chart(fig_points, use_container_width=True)
-            else:
-                st.info("No points assigned yet")
-        
-        with col2:
-            st.subheader("⚡ Qualifying vs Race Performance")
-            
-            # Scatter plot qualifying vs race (only classified drivers)
-            scatter_data = results_df[
-                (pd.notna(results_df['qualifying_position'])) & 
-                (pd.notna(results_df['position'])) &
-                (results_df['position'] > 0)
-            ].copy()
-            
-            if len(scatter_data) > 1:
-                fig_scatter = px.scatter(
-                    scatter_data,
-                    x='qualifying_position',
-                    y='position',
-                    hover_data=['driver', 'total_points'],
-                    title="Qualifying Position vs Race Position",
-                    labels={
-                        'qualifying_position': 'Qualifying Position',
-                        'position': 'Race Position'
-                    }
-                )
-                
-                # Add reference line (same position)
-                max_pos = max(scatter_data['qualifying_position'].max(), scatter_data['position'].max())
-                fig_scatter.add_shape(
-                    type="line",
-                    x0=1, y0=1, x1=max_pos, y1=max_pos,
-                    line=dict(color="red", width=2, dash="dash"),
-                )
-                
-                fig_scatter.update_layout(height=400)
-                fig_scatter.update_yaxes(autorange="reversed")  # Position 1 at top
-                fig_scatter.update_xaxes(autorange="reversed")  # Position 1 at left
-                st.plotly_chart(fig_scatter, use_container_width=True)
-            else:
-                st.info("Insufficient data for performance chart")
-
     def show_leagues_report(self):
         """Mostra il report leagues"""
         st.header("🌟 Leagues")
@@ -1043,8 +974,8 @@ class ACCWebDashboard:
 
             for league_id, name, season, start_date, end_date, total_tiers, is_completed, description in leagues:
                 # Formato display
-                status = "✅ Completed" if is_completed else "🏁 In Progress"
-                display_name = f"{name} - {season} ({status})"
+                status_str = " ✅" if is_completed else " 🔄"
+                display_name = f"{name} - {season}{status_str}"
                 league_options.append(display_name)
                 league_map[display_name] = league_id
 
@@ -1074,13 +1005,12 @@ class ACCWebDashboard:
 
                 # Header league con stile championship-header
                 season_info = f" - Stagione {season}" if season else ""
-                status_text = "✅ COMPLETED" if is_completed else "🏁 IN PROGRESS"
+                status_icon = "✅" if is_completed else "🔄"
 
                 # Costruisci l'HTML completo
                 header_html = f"""
                 <div class="championship-header">
-                    <h2>🌟 {name}{season_info}</h2>
-                    <h3 style="margin-top: 10px; font-size: 2rem;">{status_text}</h3>
+                    <h2>🌟 {name}{season_info} {status_icon}</h2>
                 """
 
                 if description:
