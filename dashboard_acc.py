@@ -1072,28 +1072,39 @@ class ACCWebDashboard:
             if league_info:
                 name, season, start_date, end_date, total_tiers, is_completed, description = league_info
 
-                # Info league
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("Season", season)
-                with col2:
-                    st.metric("Total Tiers", total_tiers)
-                with col3:
-                    status_display = "Completed ✅" if is_completed else "In Progress 🏁"
-                    st.metric("Status", status_display)
-                with col4:
-                    if start_date and end_date:
-                        try:
-                            start = datetime.fromisoformat(start_date.replace('Z', '+00:00')).strftime('%d/%m/%Y')
-                            end = datetime.fromisoformat(end_date.replace('Z', '+00:00')).strftime('%d/%m/%Y')
-                            st.metric("Period", f"{start} - {end}")
-                        except:
-                            st.metric("Period", "N/A")
+                # Header league con stile championship-header
+                season_info = f" - Stagione {season}" if season else ""
+                status_text = "✅ COMPLETED" if is_completed else "🏁 IN PROGRESS"
+
+                # Costruisci l'HTML completo
+                header_html = f"""
+                <div class="championship-header">
+                    <h2>🌟 {name}{season_info}</h2>
+                    <h3 style="margin-top: 10px; font-size: 2rem;">{status_text}</h3>
+                """
 
                 if description:
-                    st.info(f"ℹ️ {description}")
+                    header_html += f"<p style='margin-top: 10px;'>{description}</p>"
 
-                st.markdown("---")
+                # Info aggiuntive
+                info_parts = []
+                if total_tiers:
+                    info_parts.append(f"🎯 {total_tiers} Tiers")
+
+                if start_date and end_date:
+                    try:
+                        start = datetime.fromisoformat(start_date.replace('Z', '+00:00')).strftime('%d/%m/%Y')
+                        end = datetime.fromisoformat(end_date.replace('Z', '+00:00')).strftime('%d/%m/%Y')
+                        info_parts.append(f"📅 {start} - {end}")
+                    except:
+                        pass
+
+                if info_parts:
+                    header_html += f"<p style='margin-top: 10px;'>{' | '.join(info_parts)}</p>"
+
+                header_html += "</div>"
+
+                st.markdown(header_html, unsafe_allow_html=True)
 
                 # Classifica league
                 st.subheader("📊 League Standings")
@@ -1153,6 +1164,145 @@ class ACCWebDashboard:
                         st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("No standings available for this league yet")
+
+                # Selezione tier (championships)
+                st.markdown("---")
+                st.subheader("🏆 League Tiers (Championships)")
+
+                # Ottieni championships (tier) della lega
+                cursor.execute("""
+                    SELECT
+                        championship_id,
+                        name,
+                        tier_number,
+                        start_date,
+                        end_date,
+                        is_completed,
+                        description
+                    FROM championships
+                    WHERE league_id = ? AND championship_type = 'tier'
+                    ORDER BY tier_number ASC
+                """, (selected_league_id,))
+
+                tier_championships = cursor.fetchall()
+
+                if tier_championships:
+                    # Prepara opzioni per selectbox tier
+                    tier_options = ["Select a tier..."]
+                    tier_map = {}
+
+                    for champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc in tier_championships:
+                        # Formato display
+                        status_str = " ✅" if is_completed else " 🔄"
+                        date_str = f" ({date_start[:10]})" if date_start else ""
+                        display_name = f"Tier {tier_num} - {champ_name}{date_str}{status_str}"
+
+                        tier_options.append(display_name)
+                        tier_map[display_name] = champ_id
+
+                    # Selectbox tier
+                    selected_tier = st.selectbox(
+                        "🏆 Select Tier Championship:",
+                        options=tier_options,
+                        index=0,
+                        key="tier_select"
+                    )
+
+                    if selected_tier and selected_tier != "Select a tier...":
+                        tier_championship_id = tier_map[selected_tier]
+
+                        # Trova info tier selezionato
+                        selected_tier_info = next(
+                            (t for t in tier_championships if t[0] == tier_championship_id),
+                            None
+                        )
+
+                        if selected_tier_info:
+                            champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc = selected_tier_info
+
+                            # Header tier championship
+                            tier_header = f"""
+                            <div class="championship-header">
+                                <h3>🏆 Tier {tier_num} - {champ_name}</h3>
+                            """
+
+                            if desc:
+                                tier_header += f"<p>{desc}</p>"
+
+                            if date_start and date_end:
+                                tier_header += f"<p>📅 {date_start} - {date_end}</p>"
+
+                            tier_header += "</div>"
+
+                            st.markdown(tier_header, unsafe_allow_html=True)
+
+                            # Classifica tier championship
+                            st.subheader("📊 Tier Championship Leaderboard")
+                            standings_df = self.get_championship_standings(tier_championship_id)
+
+                            if not standings_df.empty:
+                                # Formatta classifica per visualizzazione
+                                standings_display = standings_df.copy()
+
+                                # Aggiungi medaglie per primi 3
+                                standings_display['Pos'] = standings_display['position'].apply(
+                                    lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
+                                )
+
+                                # Formatta i valori numerici
+                                standings_display['total_points'] = standings_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                                standings_display['gross_points'] = standings_display['gross_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                                standings_display['points_dropped'] = standings_display['points_dropped'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "")
+                                standings_display['base_points'] = standings_display['base_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                                standings_display['participation_multiplier'] = standings_display['participation_multiplier'].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "1.00")
+                                standings_display['participation_bonus'] = standings_display['participation_bonus'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "")
+                                standings_display['manual_penalties'] = standings_display['manual_penalties'].apply(lambda x: f"-{x:.0f}" if pd.notna(x) and x > 0 else "")
+
+                                # Seleziona colonne da mostrare nell'ordine richiesto
+                                columns_to_show = [
+                                    'Pos', 'driver', 'total_points', 'competitions_participated',
+                                    'wins', 'podiums', 'poles', 'fastest_laps',
+                                    'gross_points', 'points_dropped', 'base_points',
+                                    'participation_multiplier', 'participation_bonus', 'manual_penalties'
+                                ]
+
+                                # Rinomina colonne con i nomi corti
+                                column_names = {
+                                    'Pos': 'Pos',
+                                    'driver': 'Pilota',
+                                    'total_points': 'Punti',
+                                    'competitions_participated': 'Gare',
+                                    'wins': 'Vitt',
+                                    'podiums': 'Podi',
+                                    'poles': 'Pole',
+                                    'fastest_laps': 'FL',
+                                    'gross_points': 'Lordo',
+                                    'points_dropped': 'Drop',
+                                    'base_points': 'Base',
+                                    'participation_multiplier': 'Molt',
+                                    'participation_bonus': 'Bonus',
+                                    'manual_penalties': 'Pen'
+                                }
+
+                                standings_display = standings_display[columns_to_show]
+                                standings_display.columns = [column_names[col] for col in columns_to_show]
+
+                                # Mostra tabella senza indice e con altezza fissa
+                                st.dataframe(
+                                    standings_display,
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    height=400
+                                )
+
+                            else:
+                                st.warning("⚠️ Tier championship leaderboard not yet calculated")
+
+                            # Selezione competizione del tier
+                            st.markdown("---")
+                            self.show_competition_selection(tier_championship_id)
+                else:
+                    st.info("ℹ️ No tier championships found for this league")
 
             conn.close()
 
