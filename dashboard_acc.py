@@ -449,24 +449,24 @@ class ACCWebDashboard:
             st.warning("⚠️ No data available in database")
             return
 
-        # Testo introduttivo TFL
+        # TFL Introduction Text
         st.markdown("""<div style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 50%, #495057 100%); padding: 40px 30px; border-radius: 20px; margin: 20px 0; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3); text-align: center; color: white; border: 3px solid rgba(255, 255, 255, 0.15);">
-<p style="font-size: 2.5rem; font-weight: 900; margin: 0 0 25px 0; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4); letter-spacing: 1px; line-height: 1.2;">🏁 Corri quando vuoi, competi sempre 🏁</p>
+<p style="font-size: 2.5rem; font-weight: 900; margin: 0 0 25px 0; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4); letter-spacing: 1px; line-height: 1.2;">🏁 Race when you want, compete always 🏁</p>
 <div style="background: rgba(255, 255, 255, 0.25); padding: 2px; margin: 25px auto; width: 80%; border-radius: 5px;"></div>
-<p style="font-size: 1.2rem; margin: 20px 0; font-weight: 500; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Benvenuto nella dashboard ufficiale della <strong>Tier Friends League</strong></p>
-<p style="font-size: 1.1rem; margin: 25px 0 15px 0; font-weight: 600; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Usa il menu per visualizzare:</p>
+<p style="font-size: 1.2rem; margin: 20px 0; font-weight: 500; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Welcome to the official dashboard of the <strong>Tier Friends League</strong></p>
+<p style="font-size: 1.1rem; margin: 25px 0 15px 0; font-weight: 600; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Use the menu to view:</p>
 <div style="background: rgba(255, 255, 255, 0.15); padding: 20px; border-radius: 12px; margin: 20px auto; max-width: 600px; backdrop-filter: blur(10px);">
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📊 <strong>Classifiche e RIsultati</strong> - Leagues, Championships e 4Fun</p>
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">🏎️ <strong>Gare Occasionali Quotidiane</strong> - Sessions</p>
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">👤 <strong>Informazioni Piloti</strong> - Drivers</p>
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📈 <strong>Migliori Tempi Registrati</strong> - Best Laps</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📊 <strong>Standings and Results</strong> - Leagues, Championships and 4Fun</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">🏎️ <strong>Daily Casual Races</strong> - Sessions</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">👤 <strong>Driver Information</strong> - Drivers</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📈 <strong>Best Recorded Laps</strong> - Best Laps</p>
 </div>
 <div style="background: rgba(255, 255, 255, 0.25); padding: 2px; margin: 25px auto; width: 80%; border-radius: 5px;"></div>
-<p style="font-size: 1.3rem; margin: 20px 0 10px 0; font-weight: 700; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">⏰ Tutte le sere ore 23:00 • Lun-Ven</p>
-<p style="font-size: 1.1rem; margin: 15px 0 0 0; font-weight: 600; font-style: italic; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Organizzato da Terronia Racing 🏴</p>
+<p style="font-size: 1.3rem; margin: 20px 0 10px 0; font-weight: 700; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">⏰ Every night at 11:00 PM • Mon-Fri</p>
+<p style="font-size: 1.1rem; margin: 15px 0 0 0; font-weight: 600; font-style: italic; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Organized by Terronia Racing 🏴</p>
 </div>""", unsafe_allow_html=True)
 
-        # Link al regolamento
+        # Link to rulebook
         st.markdown("""<div style="text-align: center; margin: 25px 0;">
 <a href="https://raw.githubusercontent.com/PakT2R/tfl-dashboard/main/TIER_FRIENDS_LEAGUE_Regolamento.pdf" target="_blank" style="text-decoration: none;">
 <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
@@ -477,7 +477,7 @@ class ACCWebDashboard:
             cursor: pointer;">
 <p style="color: white; font-size: 1.3rem; font-weight: 700; margin: 0;
           text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);">
-📖 Leggi il Regolamento TFL Completo
+📖 Read the Complete TFL Rulebook
 </p>
 </div>
 </a>
@@ -824,35 +824,49 @@ class ACCWebDashboard:
         results_df = self.get_competition_results(competition_id)
         
         if not results_df.empty:
-            # Formatta risultati per visualizzazione - AGGIORNATO
+            # Formatta risultati per visualizzazione
             results_display = results_df.copy()
-            
+
             # Aggiungi posizione basata sull'ordine (già ordinato per punti nella query)
             results_display['Pos'] = range(1, len(results_display) + 1)
             results_display['Pos'] = results_display['Pos'].apply(
                 lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
             )
-            
-            # Seleziona e rinomina colonne - SOLO CAMPI RICHIESTI
+
+            # Formatta i valori numerici - mostra solo se > 0, altrimenti "-"
+            results_display['race_points'] = results_display['race_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
+            results_display['pole_points'] = results_display['pole_points'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "0")
+            results_display['fastest_lap_points'] = results_display['fastest_lap_points'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "0")
+            results_display['points_bonus'] = results_display['points_bonus'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
+            results_display['points_dropped'] = results_display['points_dropped'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
+            results_display['total_points'] = results_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+            results_display['guests_beaten'] = results_display['guests_beaten'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "-")
+            results_display['beaten_by_guests'] = results_display['beaten_by_guests'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "-")
+
+            # Seleziona colonne da mostrare nell'ordine richiesto
             columns_to_show = [
                 'Pos', 'driver', 'race_points', 'pole_points',
-                'fastest_lap_points', 'points_bonus', 'points_dropped', 'total_points'
+                'fastest_lap_points', 'points_bonus', 'points_dropped',
+                'total_points', 'guests_beaten', 'beaten_by_guests'
             ]
 
+            # Rinomina colonne con i nomi corti
             column_names = {
                 'Pos': 'Pos',
                 'driver': 'Driver',
-                'race_points': 'Race Points',
-                'pole_points': 'Pole Points',
-                'fastest_lap_points': 'Fast Lap Points',
-                'points_bonus': 'Bonus Points',
-                'points_dropped': 'Penalty Points',
-                'total_points': 'Total Points'
+                'race_points': 'Race Pts',
+                'pole_points': 'Pole Pts',
+                'fastest_lap_points': 'FLap Pts',
+                'points_bonus': 'Bonus Pts',
+                'points_dropped': 'Drop Pts',
+                'total_points': 'Total Pts',
+                'guests_beaten': 'G+',
+                'beaten_by_guests': 'G-'
             }
-            
+
             results_display = results_display[columns_to_show]
             results_display.columns = [column_names[col] for col in columns_to_show]
-            
+
             st.dataframe(
                 results_display,
                 use_container_width=True,
@@ -975,7 +989,8 @@ class ACCWebDashboard:
             for league_id, name, season, start_date, end_date, total_tiers, is_completed, description in leagues:
                 # Formato display
                 status_str = " ✅" if is_completed else " 🔄"
-                display_name = f"{name} - {season}{status_str}"
+                season_str = f" - {season}" if season else ""
+                display_name = f"{name}{season_str}{status_str}"
                 league_options.append(display_name)
                 league_map[display_name] = league_id
 
@@ -1066,8 +1081,8 @@ class ACCWebDashboard:
                     df_display['position'] = df_display['position'].astype(int)
 
                     # Rinomina colonne
-                    df_display.columns = ['Pos', 'Driver', 'Tier 1', 'Tier 2', 'Tier 3', 'Tier 4',
-                                         'Total Points', 'Consistency', 'Tiers', 'Wins', 'Podiums']
+                    df_display.columns = ['Pos', 'Driver', 'Tier 1 Pts', 'Tier 2 Pts', 'Tier 3 Pts', 'Tier 4 Pts',
+                                         'Total Pts', 'Consist Pts', 'n Tiers', 'n Wins', 'n Pods']
 
                     # Mostra tabella
                     st.dataframe(
@@ -1083,11 +1098,11 @@ class ACCWebDashboard:
 
                         fig = px.bar(
                             top_10,
-                            x='Total Points',
+                            x='Total Pts',
                             y='Driver',
                             orientation='h',
                             title=f"Top 10 Drivers - {name}",
-                            color='Total Points',
+                            color='Total Pts',
                             color_continuous_scale='Blues'
                         )
                         fig.update_layout(height=500, yaxis={'categoryorder':'total ascending'})
@@ -1199,19 +1214,19 @@ class ACCWebDashboard:
                                 # Rinomina colonne con i nomi corti
                                 column_names = {
                                     'Pos': 'Pos',
-                                    'driver': 'Pilota',
-                                    'total_points': 'Punti',
-                                    'competitions_participated': 'Gare',
-                                    'wins': 'Vitt',
-                                    'podiums': 'Podi',
-                                    'poles': 'Pole',
-                                    'fastest_laps': 'FL',
-                                    'gross_points': 'Lordo',
-                                    'points_dropped': 'Drop',
-                                    'base_points': 'Base',
-                                    'participation_multiplier': 'Molt',
-                                    'participation_bonus': 'Bonus',
-                                    'manual_penalties': 'Pen'
+                                    'driver': 'Driver',
+                                    'total_points': 'Total Pts',
+                                    'competitions_participated': 'n Races',
+                                    'wins': 'n Wins',
+                                    'podiums': 'n Pods',
+                                    'poles': 'n Pole',
+                                    'fastest_laps': 'n FLap',
+                                    'gross_points': 'Gross Pts',
+                                    'points_dropped': 'Drop Pts',
+                                    'base_points': 'Base Pts',
+                                    'participation_multiplier': 'Mult',
+                                    'participation_bonus': 'Bonus Pts',
+                                    'manual_penalties': 'Penalty Pts'
                                 }
 
                                 standings_display = standings_display[columns_to_show]
@@ -1341,19 +1356,19 @@ class ACCWebDashboard:
                     # Rinomina colonne con i nomi corti
                     column_names = {
                         'Pos': 'Pos',
-                        'driver': 'Pilota',
-                        'total_points': 'Punti',
-                        'competitions_participated': 'Gare',
-                        'wins': 'Vitt',
-                        'podiums': 'Podi',
-                        'poles': 'Pole',
-                        'fastest_laps': 'FL',
-                        'gross_points': 'Lordo',
-                        'points_dropped': 'Drop',
-                        'base_points': 'Base',
-                        'participation_multiplier': 'Molt',
-                        'participation_bonus': 'Bonus',
-                        'manual_penalties': 'Pen'
+                        'driver': 'Driver',
+                        'total_points': 'Total Pts',
+                        'competitions_participated': 'n Races',
+                        'wins': 'n Wins',
+                        'podiums': 'n Pods',
+                        'poles': 'n Pole',
+                        'fastest_laps': 'n FLap',
+                        'gross_points': 'Gross Pts',
+                        'points_dropped': 'Drop Pts',
+                        'base_points': 'Base Pts',
+                        'participation_multiplier': 'Mult',
+                        'participation_bonus': 'Bonus Pts',
+                        'manual_penalties': 'Penalty Pts'
                     }
 
                     standings_display = standings_display[columns_to_show]
@@ -1467,13 +1482,13 @@ class ACCWebDashboard:
             # Rinomina colonne con i nomi corti
             column_names = {
                 'Pos': 'Pos',
-                'driver': 'Pilota',
-                'race_points': 'Gara',
-                'pole_points': 'Pole',
-                'fastest_lap_points': 'FL',
-                'points_bonus': 'Bonus',
-                'points_dropped': 'Drop',
-                'total_points': 'Tot',
+                'driver': 'Driver',
+                'race_points': 'Race Pts',
+                'pole_points': 'Pole Pts',
+                'fastest_lap_points': 'FLap Pts',
+                'points_bonus': 'Bonus Pts',
+                'points_dropped': 'Drop Pts',
+                'total_points': 'Total Pts',
                 'guests_beaten': 'G+',
                 'beaten_by_guests': 'G-'
             }
