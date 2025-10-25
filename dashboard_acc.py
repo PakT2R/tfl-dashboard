@@ -665,29 +665,34 @@ class ACCWebDashboard:
         return self.safe_sql_query(query, [competition_id])
     
     def get_competition_sessions(self, competition_id: int) -> List[Tuple]:
-        """Ottiene sessioni della competizione"""
+        """Ottiene sessioni della competizione con nome del pilota che ha fatto il best lap"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            
+
             cursor.execute("""
-                SELECT 
-                    session_id,
-                    session_type,
-                    session_date,
-                    session_order,
-                    total_drivers,
-                    best_lap_overall
-                FROM sessions
-                WHERE competition_id = ?
-                ORDER BY session_order, session_date
+                SELECT
+                    s.session_id,
+                    s.session_type,
+                    s.session_date,
+                    s.session_order,
+                    s.total_drivers,
+                    s.best_lap_overall,
+                    d.last_name as best_lap_driver
+                FROM sessions s
+                LEFT JOIN session_results sr ON s.session_id = sr.session_id
+                    AND s.best_lap_overall = sr.best_lap
+                    AND sr.is_spectator = FALSE
+                LEFT JOIN drivers d ON sr.driver_id = d.driver_id
+                WHERE s.competition_id = ?
+                ORDER BY s.session_order, s.session_date
             """, (competition_id,))
-            
+
             sessions = cursor.fetchall()
             conn.close()
-            
+
             return sessions
-            
+
         except Exception as e:
             st.error(f"❌ Errore nel recupero sessioni: {e}")
             return []
@@ -879,26 +884,27 @@ class ACCWebDashboard:
         # Sessioni della competizione (stesso metodo)
         st.markdown("---")
         st.subheader("🎮 4Fun Competition Sessions")
-        
+
         sessions = self.get_competition_sessions(competition_id)
-        
+
         if sessions:
-            for session_id, session_type, session_date, session_order, total_drivers, best_lap_overall in sessions:
+            for session_id, session_type, session_date, session_order, total_drivers, best_lap_overall, best_lap_driver in sessions:
                 # Format data
                 try:
                     date_obj = datetime.fromisoformat(session_date.replace('Z', '+00:00'))
                     date_str = date_obj.strftime('%d/%m/%Y %H:%M')
                 except:
                     date_str = session_date[:16] if session_date else 'N/A'
-                
+
                 # Header sessione
+                best_lap_text = f'⚡ Best: {self.format_lap_time(best_lap_overall)} ({best_lap_driver})' if best_lap_overall and best_lap_driver else (f'⚡ Best: {self.format_lap_time(best_lap_overall)}' if best_lap_overall else '')
                 st.markdown(f"""
                 <div class="session-header">
                     <strong>🏁 {session_type}</strong> - {date_str} | 👥 {total_drivers} drivers
-                    {f'| ⚡ Best: {self.format_lap_time(best_lap_overall)}' if best_lap_overall else ''}
+                    {f'| {best_lap_text}' if best_lap_text else ''}
                 </div>
                 """, unsafe_allow_html=True)
-                
+
                 # Risultati sessione (stesso metodo)
                 session_results_df = self.get_session_results(session_id)
                 
@@ -1066,7 +1072,9 @@ class ACCWebDashboard:
                         ls.consistency_bonus,
                         ls.tiers_participated,
                         ls.total_wins,
-                        ls.total_podiums
+                        ls.total_podiums,
+                        ls.total_poles,
+                        ls.total_fastest_laps
                     FROM league_standings ls
                     JOIN drivers d ON ls.driver_id = d.driver_id
                     WHERE ls.league_id = ?
@@ -1082,7 +1090,7 @@ class ACCWebDashboard:
 
                     # Rinomina colonne
                     df_display.columns = ['Pos', 'Driver', 'Tier 1 Pts', 'Tier 2 Pts', 'Tier 3 Pts', 'Tier 4 Pts',
-                                         'Total Pts', 'Consist Pts', 'n Tiers', 'n Wins', 'n Pods']
+                                         'Total Pts', 'Consist Pts', 'n Tiers', 'n Wins', 'n Pods', 'n Pole', 'n FLap']
 
                     # Mostra tabella
                     st.dataframe(
@@ -1090,23 +1098,6 @@ class ACCWebDashboard:
                         use_container_width=True,
                         hide_index=True
                     )
-
-                    # Grafico top 10
-                    if len(df_display) > 0:
-                        st.subheader("📈 Top 10 Drivers")
-                        top_10 = df_display.head(10)
-
-                        fig = px.bar(
-                            top_10,
-                            x='Total Pts',
-                            y='Driver',
-                            orientation='h',
-                            title=f"Top 10 Drivers - {name}",
-                            color='Total Pts',
-                            color_continuous_scale='Blues'
-                        )
-                        fig.update_layout(height=500, yaxis={'categoryorder':'total ascending'})
-                        st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("No standings available for this league yet")
 
@@ -1507,26 +1498,27 @@ class ACCWebDashboard:
         # Sessioni della competizione
         st.markdown("---")
         st.subheader("🎮 Competition Sessions")
-        
+
         sessions = self.get_competition_sessions(competition_id)
-        
+
         if sessions:
-            for session_id, session_type, session_date, session_order, total_drivers, best_lap_overall in sessions:
+            for session_id, session_type, session_date, session_order, total_drivers, best_lap_overall, best_lap_driver in sessions:
                 # Format data
                 try:
                     date_obj = datetime.fromisoformat(session_date.replace('Z', '+00:00'))
                     date_str = date_obj.strftime('%d/%m/%Y %H:%M')
                 except:
                     date_str = session_date[:16] if session_date else 'N/A'
-                
+
                 # Header sessione
+                best_lap_text = f'⚡ Best: {self.format_lap_time(best_lap_overall)} ({best_lap_driver})' if best_lap_overall and best_lap_driver else (f'⚡ Best: {self.format_lap_time(best_lap_overall)}' if best_lap_overall else '')
                 st.markdown(f"""
                 <div class="session-header">
                     <strong>🏁 {session_type}</strong> - {date_str} | 👥 {total_drivers} drivers
-                    {f'| ⚡ Best: {self.format_lap_time(best_lap_overall)}' if best_lap_overall else ''}
+                    {f'| {best_lap_text}' if best_lap_text else ''}
                 </div>
                 """, unsafe_allow_html=True)
-                
+
                 # Risultati sessione
                 session_results_df = self.get_session_results(session_id)
                 
