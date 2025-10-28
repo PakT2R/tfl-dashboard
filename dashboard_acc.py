@@ -655,11 +655,14 @@ class ACCWebDashboard:
                 cs.points_dropped,
                 cs.total_points,
                 cs.guests_beaten,
-                cs.beaten_by_guests
+                cs.beaten_by_guests,
+                d.trust_level
             FROM competition_standings cs
             JOIN drivers d ON cs.driver_id = d.driver_id
             WHERE cs.competition_id = ?
-            ORDER BY cs.total_points DESC, cs.race_points DESC
+            ORDER BY cs.total_points DESC,
+                     CASE WHEN cs.total_points = 0 THEN d.trust_level ELSE 0 END DESC,
+                     cs.race_points DESC
         """
 
         return self.safe_sql_query(query, [competition_id])
@@ -838,15 +841,30 @@ class ACCWebDashboard:
                 lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
             )
 
-            # Formatta i valori numerici - mostra solo se > 0, altrimenti "-"
-            results_display['race_points'] = results_display['race_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
-            results_display['pole_points'] = results_display['pole_points'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "0")
-            results_display['fastest_lap_points'] = results_display['fastest_lap_points'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "0")
-            results_display['points_bonus'] = results_display['points_bonus'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
+            # Formatta i valori numerici
+            # Race points: "0.0" per membri con 0 punti, "-" per guest con 0 punti, altrimenti valore
+            results_display['race_points'] = results_display.apply(
+                lambda row: "0.0" if pd.notna(row['race_points']) and row['race_points'] == 0 and row['trust_level'] > 0
+                else ("-" if pd.notna(row['race_points']) and row['race_points'] == 0
+                else (f"{row['race_points']:.1f}" if pd.notna(row['race_points']) else "-")),
+                axis=1
+            )
+            results_display['pole_points'] = results_display['pole_points'].apply(lambda x: f"{int(x)}" if pd.notna(x) and x > 0 else "-")
+            results_display['fastest_lap_points'] = results_display['fastest_lap_points'].apply(lambda x: f"{int(x)}" if pd.notna(x) and x > 0 else "-")
+            # Bonus: mostra + se positivo, - se negativo, "-" se zero/null
+            results_display['points_bonus'] = results_display['points_bonus'].apply(
+                lambda x: f"+{x:.1f}" if pd.notna(x) and x > 0 else (f"-{abs(x):.1f}" if pd.notna(x) and x < 0 else "-")
+            )
             results_display['points_dropped'] = results_display['points_dropped'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
-            results_display['total_points'] = results_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
-            results_display['guests_beaten'] = results_display['guests_beaten'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "-")
-            results_display['beaten_by_guests'] = results_display['beaten_by_guests'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "-")
+            # Total points: "0.0" per membri con 0 punti, "-" per guest con 0 punti, altrimenti valore
+            results_display['total_points'] = results_display.apply(
+                lambda row: "0.0" if pd.notna(row['total_points']) and row['total_points'] == 0 and row['trust_level'] > 0
+                else ("-" if pd.notna(row['total_points']) and row['total_points'] == 0
+                else (f"{row['total_points']:.1f}" if pd.notna(row['total_points']) else "-")),
+                axis=1
+            )
+            results_display['guests_beaten'] = results_display['guests_beaten'].apply(lambda x: f"{int(x)}" if pd.notna(x) and x > 0 else "-")
+            results_display['beaten_by_guests'] = results_display['beaten_by_guests'].apply(lambda x: f"{int(x)}" if pd.notna(x) and x > 0 else "-")
 
             # Seleziona colonne da mostrare nell'ordine richiesto
             columns_to_show = [
@@ -1185,39 +1203,44 @@ class ACCWebDashboard:
                                     lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
                                 )
 
-                                # Formatta i valori numerici
-                                standings_display['total_points'] = standings_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                                # Formatta i valori numerici - usa "-" per zero/null
+                                standings_display['competitions_participated'] = standings_display['competitions_participated'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
+                                standings_display['wins'] = standings_display['wins'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
+                                standings_display['podiums'] = standings_display['podiums'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
+                                standings_display['poles'] = standings_display['poles'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
+                                standings_display['fastest_laps'] = standings_display['fastest_laps'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                                 standings_display['gross_points'] = standings_display['gross_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
-                                standings_display['points_dropped'] = standings_display['points_dropped'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "")
+                                standings_display['points_dropped'] = standings_display['points_dropped'].apply(lambda x: f"-{x:.1f}" if pd.notna(x) and x > 0 else "-")
                                 standings_display['base_points'] = standings_display['base_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
-                                standings_display['participation_multiplier'] = standings_display['participation_multiplier'].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "1.00")
-                                standings_display['participation_bonus'] = standings_display['participation_bonus'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "")
-                                standings_display['manual_penalties'] = standings_display['manual_penalties'].apply(lambda x: f"-{x:.0f}" if pd.notna(x) and x > 0 else "")
+                                standings_display['participation_multiplier'] = standings_display['participation_multiplier'].apply(lambda x: f"{x:.2f}" if pd.notna(x) and x != 1.0 else "-")
+                                standings_display['participation_bonus'] = standings_display['participation_bonus'].apply(lambda x: f"+{x:.1f}" if pd.notna(x) and x > 0 else "-")
+                                standings_display['manual_penalties'] = standings_display['manual_penalties'].apply(lambda x: f"-{x:.0f}" if pd.notna(x) and x > 0 else "-")
+                                standings_display['total_points'] = standings_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
 
-                                # Seleziona colonne da mostrare nell'ordine richiesto
+                                # Seleziona colonne da mostrare nell'ordine richiesto: Pos, Driver, Races, Wins, Pods, Pole, FL, Gross, Drop, Base, Mult, Bonus, Pen, Total
                                 columns_to_show = [
-                                    'Pos', 'driver', 'total_points', 'competitions_participated',
-                                    'wins', 'podiums', 'poles', 'fastest_laps',
-                                    'gross_points', 'points_dropped', 'base_points',
-                                    'participation_multiplier', 'participation_bonus', 'manual_penalties'
+                                    'Pos', 'driver', 'competitions_participated', 'wins', 'podiums',
+                                    'poles', 'fastest_laps', 'gross_points', 'points_dropped',
+                                    'base_points', 'participation_multiplier', 'participation_bonus',
+                                    'manual_penalties', 'total_points'
                                 ]
 
                                 # Rinomina colonne con i nomi corti
                                 column_names = {
                                     'Pos': 'Pos',
                                     'driver': 'Driver',
-                                    'total_points': 'Total Pts',
-                                    'competitions_participated': 'n Races',
-                                    'wins': 'n Wins',
-                                    'podiums': 'n Pods',
-                                    'poles': 'n Pole',
-                                    'fastest_laps': 'n FLap',
-                                    'gross_points': 'Gross Pts',
-                                    'points_dropped': 'Drop Pts',
-                                    'base_points': 'Base Pts',
+                                    'competitions_participated': 'Races',
+                                    'wins': 'Wins',
+                                    'podiums': 'Pods',
+                                    'poles': 'Pole',
+                                    'fastest_laps': 'FL',
+                                    'gross_points': 'Gross',
+                                    'points_dropped': 'Drop',
+                                    'base_points': 'Base',
                                     'participation_multiplier': 'Mult',
-                                    'participation_bonus': 'Bonus Pts',
-                                    'manual_penalties': 'Penalty Pts'
+                                    'participation_bonus': 'Bonus',
+                                    'manual_penalties': 'Pen',
+                                    'total_points': 'Total'
                                 }
 
                                 standings_display = standings_display[columns_to_show]
@@ -1327,39 +1350,44 @@ class ACCWebDashboard:
                         lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
                     )
 
-                    # Formatta i valori numerici
-                    standings_display['total_points'] = standings_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                    # Formatta i valori numerici - usa "-" per zero/null
+                    standings_display['competitions_participated'] = standings_display['competitions_participated'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
+                    standings_display['wins'] = standings_display['wins'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
+                    standings_display['podiums'] = standings_display['podiums'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
+                    standings_display['poles'] = standings_display['poles'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
+                    standings_display['fastest_laps'] = standings_display['fastest_laps'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                     standings_display['gross_points'] = standings_display['gross_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
-                    standings_display['points_dropped'] = standings_display['points_dropped'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "")
+                    standings_display['points_dropped'] = standings_display['points_dropped'].apply(lambda x: f"-{x:.1f}" if pd.notna(x) and x > 0 else "-")
                     standings_display['base_points'] = standings_display['base_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
-                    standings_display['participation_multiplier'] = standings_display['participation_multiplier'].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "1.00")
-                    standings_display['participation_bonus'] = standings_display['participation_bonus'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "")
-                    standings_display['manual_penalties'] = standings_display['manual_penalties'].apply(lambda x: f"-{x:.0f}" if pd.notna(x) and x > 0 else "")
+                    standings_display['participation_multiplier'] = standings_display['participation_multiplier'].apply(lambda x: f"{x:.2f}" if pd.notna(x) and x != 1.0 else "-")
+                    standings_display['participation_bonus'] = standings_display['participation_bonus'].apply(lambda x: f"+{x:.1f}" if pd.notna(x) and x > 0 else "-")
+                    standings_display['manual_penalties'] = standings_display['manual_penalties'].apply(lambda x: f"-{x:.0f}" if pd.notna(x) and x > 0 else "-")
+                    standings_display['total_points'] = standings_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
 
-                    # Seleziona colonne da mostrare nell'ordine richiesto
+                    # Seleziona colonne da mostrare nell'ordine richiesto: Pos, Driver, Races, Wins, Pods, Pole, FL, Gross, Drop, Base, Mult, Bonus, Pen, Total
                     columns_to_show = [
-                        'Pos', 'driver', 'total_points', 'competitions_participated',
-                        'wins', 'podiums', 'poles', 'fastest_laps',
-                        'gross_points', 'points_dropped', 'base_points',
-                        'participation_multiplier', 'participation_bonus', 'manual_penalties'
+                        'Pos', 'driver', 'competitions_participated', 'wins', 'podiums',
+                        'poles', 'fastest_laps', 'gross_points', 'points_dropped',
+                        'base_points', 'participation_multiplier', 'participation_bonus',
+                        'manual_penalties', 'total_points'
                     ]
 
                     # Rinomina colonne con i nomi corti
                     column_names = {
                         'Pos': 'Pos',
                         'driver': 'Driver',
-                        'total_points': 'Total Pts',
-                        'competitions_participated': 'n Races',
-                        'wins': 'n Wins',
-                        'podiums': 'n Pods',
-                        'poles': 'n Pole',
-                        'fastest_laps': 'n FLap',
-                        'gross_points': 'Gross Pts',
-                        'points_dropped': 'Drop Pts',
-                        'base_points': 'Base Pts',
+                        'competitions_participated': 'Races',
+                        'wins': 'Wins',
+                        'podiums': 'Pods',
+                        'poles': 'Pole',
+                        'fastest_laps': 'FL',
+                        'gross_points': 'Gross',
+                        'points_dropped': 'Drop',
+                        'base_points': 'Base',
                         'participation_multiplier': 'Mult',
-                        'participation_bonus': 'Bonus Pts',
-                        'manual_penalties': 'Penalty Pts'
+                        'participation_bonus': 'Bonus',
+                        'manual_penalties': 'Pen',
+                        'total_points': 'Total'
                     }
 
                     standings_display = standings_display[columns_to_show]
@@ -1453,15 +1481,30 @@ class ACCWebDashboard:
                 lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
             )
 
-            # Formatta i valori numerici - mostra solo se > 0, altrimenti "-"
-            results_display['race_points'] = results_display['race_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
-            results_display['pole_points'] = results_display['pole_points'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "0")
-            results_display['fastest_lap_points'] = results_display['fastest_lap_points'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "0")
-            results_display['points_bonus'] = results_display['points_bonus'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
+            # Formatta i valori numerici
+            # Race points: "0.0" per membri con 0 punti, "-" per guest con 0 punti, altrimenti valore
+            results_display['race_points'] = results_display.apply(
+                lambda row: "0.0" if pd.notna(row['race_points']) and row['race_points'] == 0 and row['trust_level'] > 0
+                else ("-" if pd.notna(row['race_points']) and row['race_points'] == 0
+                else (f"{row['race_points']:.1f}" if pd.notna(row['race_points']) else "-")),
+                axis=1
+            )
+            results_display['pole_points'] = results_display['pole_points'].apply(lambda x: f"{int(x)}" if pd.notna(x) and x > 0 else "-")
+            results_display['fastest_lap_points'] = results_display['fastest_lap_points'].apply(lambda x: f"{int(x)}" if pd.notna(x) and x > 0 else "-")
+            # Bonus: mostra + se positivo, - se negativo, "-" se zero/null
+            results_display['points_bonus'] = results_display['points_bonus'].apply(
+                lambda x: f"+{x:.1f}" if pd.notna(x) and x > 0 else (f"-{abs(x):.1f}" if pd.notna(x) and x < 0 else "-")
+            )
             results_display['points_dropped'] = results_display['points_dropped'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
-            results_display['total_points'] = results_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
-            results_display['guests_beaten'] = results_display['guests_beaten'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "-")
-            results_display['beaten_by_guests'] = results_display['beaten_by_guests'].apply(lambda x: f"{x:.0f}" if pd.notna(x) and x > 0 else "-")
+            # Total points: "0.0" per membri con 0 punti, "-" per guest con 0 punti, altrimenti valore
+            results_display['total_points'] = results_display.apply(
+                lambda row: "0.0" if pd.notna(row['total_points']) and row['total_points'] == 0 and row['trust_level'] > 0
+                else ("-" if pd.notna(row['total_points']) and row['total_points'] == 0
+                else (f"{row['total_points']:.1f}" if pd.notna(row['total_points']) else "-")),
+                axis=1
+            )
+            results_display['guests_beaten'] = results_display['guests_beaten'].apply(lambda x: f"{int(x)}" if pd.notna(x) and x > 0 else "-")
+            results_display['beaten_by_guests'] = results_display['beaten_by_guests'].apply(lambda x: f"{int(x)}" if pd.notna(x) and x > 0 else "-")
 
             # Seleziona colonne da mostrare nell'ordine richiesto
             columns_to_show = [
