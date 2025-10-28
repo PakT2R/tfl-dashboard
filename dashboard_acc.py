@@ -890,8 +890,14 @@ class ACCWebDashboard:
             results_display = results_display[columns_to_show]
             results_display.columns = [column_names[col] for col in columns_to_show]
 
+            # Applica stile: Total Pts in grassetto e verde
+            def highlight_total(s):
+                return ['font-weight: bold; color: green;' if s.name == 'Total Pts' else '' for _ in s]
+
+            styled_display = results_display.style.apply(highlight_total, axis=0)
+
             st.dataframe(
-                results_display,
+                styled_display,
                 use_container_width=True,
                 hide_index=True
             )
@@ -1106,13 +1112,32 @@ class ACCWebDashboard:
                     df_display = df_standings.copy()
                     df_display['position'] = df_display['position'].astype(int)
 
-                    # Rinomina colonne
+                    # Rinomina colonne (nell'ordine originale della query)
                     df_display.columns = ['Pos', 'Driver', 'Tier 1 Pts', 'Tier 2 Pts', 'Tier 3 Pts', 'Tier 4 Pts',
                                          'Total Pts', 'Consist Pts', 'n Tiers', 'n Wins', 'n Pods', 'n Pole', 'n FLap']
 
+                    # Formatta valori numerici con 1 decimale per i punti
+                    df_display['Tier 1 Pts'] = df_display['Tier 1 Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                    df_display['Tier 2 Pts'] = df_display['Tier 2 Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                    df_display['Tier 3 Pts'] = df_display['Tier 3 Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                    df_display['Tier 4 Pts'] = df_display['Tier 4 Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                    df_display['Total Pts'] = df_display['Total Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                    df_display['Consist Pts'] = df_display['Consist Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+
+                    # Riordina colonne: Pos, Driver, n Tiers, n Wins, n Pods, n Pole, n FLap, Tier 1-4, Consist, Total
+                    column_order = ['Pos', 'Driver', 'n Tiers', 'n Wins', 'n Pods', 'n Pole', 'n FLap',
+                                   'Tier 1 Pts', 'Tier 2 Pts', 'Tier 3 Pts', 'Tier 4 Pts', 'Consist Pts', 'Total Pts']
+                    df_display = df_display[column_order]
+
+                    # Applica stile: Total Pts in grassetto e verde
+                    def highlight_total_league(s):
+                        return ['font-weight: bold; color: green;' if s.name == 'Total Pts' else '' for _ in s]
+
+                    styled_league = df_display.style.apply(highlight_total_league, axis=0)
+
                     # Mostra tabella
                     st.dataframe(
-                        df_display,
+                        styled_league,
                         use_container_width=True,
                         hide_index=True
                     )
@@ -1145,7 +1170,9 @@ class ACCWebDashboard:
                     tier_options = ["Select a tier..."]
                     tier_map = {}
 
-                    for champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc in tier_championships:
+                    # Trova il primo tier completato o il primo in corso
+                    default_tier_index = 1  # Default al primo tier (dopo "Select a tier...")
+                    for idx, (champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc) in enumerate(tier_championships):
                         # Formato display
                         status_str = " ✅" if is_completed else " 🔄"
                         date_str = f" ({date_start[:10]})" if date_start else ""
@@ -1154,11 +1181,15 @@ class ACCWebDashboard:
                         tier_options.append(display_name)
                         tier_map[display_name] = champ_id
 
+                        # Se è il primo completato, usa questo come default
+                        if is_completed and default_tier_index == 1:
+                            default_tier_index = idx + 1  # +1 perché la prima opzione è "Select a tier..."
+
                     # Selectbox tier
                     selected_tier = st.selectbox(
                         "🏆 Select Tier Championship:",
                         options=tier_options,
-                        index=0,
+                        index=default_tier_index,
                         key="tier_select"
                     )
 
@@ -1234,21 +1265,27 @@ class ACCWebDashboard:
                                     'podiums': 'Pods',
                                     'poles': 'Pole',
                                     'fastest_laps': 'FL',
-                                    'gross_points': 'Gross',
-                                    'points_dropped': 'Drop',
-                                    'base_points': 'Base',
+                                    'gross_points': 'Gross Pts',
+                                    'points_dropped': 'Drop Pts',
+                                    'base_points': 'Base Pts',
                                     'participation_multiplier': 'Mult',
-                                    'participation_bonus': 'Bonus',
-                                    'manual_penalties': 'Pen',
-                                    'total_points': 'Total'
+                                    'participation_bonus': 'Bonus Pts',
+                                    'manual_penalties': 'Pen Pts',
+                                    'total_points': 'Total Pts'
                                 }
 
                                 standings_display = standings_display[columns_to_show]
                                 standings_display.columns = [column_names[col] for col in columns_to_show]
 
+                                # Applica stile: Total Pts in grassetto e verde
+                                def highlight_total_champ(s):
+                                    return ['font-weight: bold; color: green;' if s.name == 'Total Pts' else '' for _ in s]
+
+                                styled_standings = standings_display.style.apply(highlight_total_champ, axis=0)
+
                                 # Mostra tabella senza indice e con altezza fissa
                                 st.dataframe(
-                                    standings_display,
+                                    styled_standings,
                                     use_container_width=True,
                                     hide_index=True,
                                     height=400
@@ -1381,21 +1418,27 @@ class ACCWebDashboard:
                         'podiums': 'Pods',
                         'poles': 'Pole',
                         'fastest_laps': 'FL',
-                        'gross_points': 'Gross',
-                        'points_dropped': 'Drop',
-                        'base_points': 'Base',
+                        'gross_points': 'Gross Pts',
+                        'points_dropped': 'Drop Pts',
+                        'base_points': 'Base Pts',
                         'participation_multiplier': 'Mult',
-                        'participation_bonus': 'Bonus',
-                        'manual_penalties': 'Pen',
-                        'total_points': 'Total'
+                        'participation_bonus': 'Bonus Pts',
+                        'manual_penalties': 'Pen Pts',
+                        'total_points': 'Total Pts'
                     }
 
                     standings_display = standings_display[columns_to_show]
                     standings_display.columns = [column_names[col] for col in columns_to_show]
 
+                    # Applica stile: Total Pts in grassetto e verde
+                    def highlight_total_champ(s):
+                        return ['font-weight: bold; color: green;' if s.name == 'Total Pts' else '' for _ in s]
+
+                    styled_standings = standings_display.style.apply(highlight_total_champ, axis=0)
+
                     # Mostra tabella senza indice e con altezza fissa
                     st.dataframe(
-                        standings_display,
+                        styled_standings,
                         use_container_width=True,
                         hide_index=True,
                         height=400
@@ -1422,23 +1465,29 @@ class ACCWebDashboard:
         # Prepara opzioni per selectbox
         competition_options = ["Select a competition..."]
         competition_map = {}
-        
-        for comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed in competitions:
+
+        # Trova la prima competizione completata o la prima in corso
+        default_comp_index = 1  # Default alla prima competition (dopo "Select a competition...")
+        for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed) in enumerate(competitions):
             # Formato display
             round_str = f"R{round_num} - " if round_num else ""
             status_str = " ✅" if is_completed else " 🔄"
             date_str = f" ({date_start[:10]})" if date_start else ""
-            
+
             display_name = f"{round_str}{name} - {track}{date_str}{status_str}"
-            
+
             competition_options.append(display_name)
             competition_map[display_name] = comp_id
-        
+
+            # Se è la prima completata, usa questa come default
+            if is_completed and default_comp_index == 1:
+                default_comp_index = idx + 1  # +1 perché la prima opzione è "Select a competition..."
+
         # Selectbox competizione
         selected_competition = st.selectbox(
             "🏁 Select Competition:",
             options=competition_options,
-            index=0,
+            index=default_comp_index,
             key="competition_select"
         )
         
@@ -1530,8 +1579,14 @@ class ACCWebDashboard:
             results_display = results_display[columns_to_show]
             results_display.columns = [column_names[col] for col in columns_to_show]
 
+            # Applica stile: Total Pts in grassetto e verde
+            def highlight_total(s):
+                return ['font-weight: bold; color: green;' if s.name == 'Total Pts' else '' for _ in s]
+
+            styled_display = results_display.style.apply(highlight_total, axis=0)
+
             st.dataframe(
-                results_display,
+                styled_display,
                 use_container_width=True,
                 hide_index=True
             )
