@@ -1466,8 +1466,6 @@ class ACCWebDashboard:
         competition_options = ["Select a competition..."]
         competition_map = {}
 
-        # Trova la prima competizione completata o la prima in corso
-        default_comp_index = 1  # Default alla prima competition (dopo "Select a competition...")
         for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed) in enumerate(competitions):
             # Formato display
             round_str = f"R{round_num} - " if round_num else ""
@@ -1479,15 +1477,11 @@ class ACCWebDashboard:
             competition_options.append(display_name)
             competition_map[display_name] = comp_id
 
-            # Se è la prima completata, usa questa come default
-            if is_completed and default_comp_index == 1:
-                default_comp_index = idx + 1  # +1 perché la prima opzione è "Select a competition..."
-
-        # Selectbox competizione
+        # Selectbox competizione - seleziona sempre la prima (già ordinata correttamente dalla query)
         selected_competition = st.selectbox(
             "🏁 Select Competition:",
             options=competition_options,
-            index=default_comp_index,
+            index=1,  # Seleziona la prima competizione reale (dopo "Select a competition...")
             key="competition_select"
         )
         
