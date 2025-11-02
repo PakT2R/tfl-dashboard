@@ -456,10 +456,10 @@ class ACCWebDashboard:
 <p style="font-size: 1.2rem; margin: 20px 0; font-weight: 500; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Welcome to the official dashboard of the <strong>Tier Friends League</strong></p>
 <p style="font-size: 1.1rem; margin: 25px 0 15px 0; font-weight: 600; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Use the menu to view:</p>
 <div style="background: rgba(255, 255, 255, 0.15); padding: 20px; border-radius: 12px; margin: 20px auto; max-width: 600px; backdrop-filter: blur(10px);">
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📊 <strong>Standings and Results</strong> - Leagues, Championships and 4Fun</p>
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">🏎️ <strong>Daily Casual Races</strong> - Sessions</p>
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">👤 <strong>Driver Information</strong> - Drivers</p>
-<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📈 <strong>Best Recorded Laps</strong> - Best Laps</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📊 <strong>Standings and Results</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">🏎️ <strong>Daily Casual Races</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📈 <strong>Best Recorded Laps</p>
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">👤 <strong>Driver Information</p>
 </div>
 <div style="background: rgba(255, 255, 255, 0.25); padding: 2px; margin: 25px auto; width: 80%; border-radius: 5px;"></div>
 <p style="font-size: 1.3rem; margin: 20px 0 10px 0; font-weight: 700; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">⏰ Every night at 11:00 PM • Mon-Fri</p>
@@ -1693,16 +1693,10 @@ class ACCWebDashboard:
         # Ottieni statistiche per il periodo selezionato
         st.markdown("---")
         sessions_stats = self.get_sessions_statistics(date_from, date_to)
-        
+
         if not any(sessions_stats.values()):
             st.warning(f"⚠️ No sessions found in the selected period ({date_from} - {date_to})")
             return
-        
-        # STATISTICHE PRINCIPALI
-        self.show_sessions_main_stats(sessions_stats)
-        
-        # SELEZIONE SESSIONE (STILE BEST LAP REPORT)
-        st.markdown("---")
         
         # Ottieni lista sessioni per selezione
         sessions_list = self.get_sessions_list_with_details(date_from, date_to)
@@ -1751,7 +1745,7 @@ class ACCWebDashboard:
             # Mostra riepilogo generale (tabella di tutte le sessioni)
             st.markdown("---")
             st.subheader("📋 Sessions List Summary")
-            self.show_sessions_summary_table(sessions_list)
+            self.show_sessions_summary_table(sessions_list, sessions_stats)
             
         elif selected_session_option in session_map:
             # Mostra dettagli della sessione specifica
@@ -1759,7 +1753,7 @@ class ACCWebDashboard:
             st.markdown("---")
             self.show_session_details(selected_session_id)
     
-    def show_sessions_summary_table(self, sessions_list: pd.DataFrame):
+    def show_sessions_summary_table(self, sessions_list: pd.DataFrame, sessions_stats: Dict = None):
         """Mostra tabella riassuntiva di tutte le sessioni (General Summary)"""
         if sessions_list.empty:
             st.warning("⚠️ No sessions found")
@@ -1822,17 +1816,44 @@ class ACCWebDashboard:
         total_sessions = len(final_display)
         official_count = len(display_df[pd.notna(display_df['competition_id'])])
         unofficial_count = total_sessions - official_count
-        
+
         col1, col2, col3 = st.columns(3)
-        
+
         with col1:
             st.info(f"📊 **{total_sessions}** total sessions in period")
-        
+
         with col2:
             st.success(f"🏆 **{official_count}** official sessions")
-        
+
         with col3:
             st.warning(f"❌ **{unofficial_count}** unofficial sessions")
+
+        # Statistiche dettagliate (dopo la tabella)
+        if sessions_stats:
+            st.markdown("---")
+            st.subheader("📊 Period Statistics")
+
+            # Formatta data ultima sessione
+            if sessions_stats.get('last_session_date'):
+                try:
+                    last_date = datetime.fromisoformat(sessions_stats['last_session_date'].replace('Z', '+00:00'))
+                    last_date_str = last_date.strftime('%d/%m/%Y %H:%M')
+                except:
+                    last_date_str = sessions_stats['last_session_date'][:16] if sessions_stats['last_session_date'] else "N/A"
+            else:
+                last_date_str = "N/A"
+
+            # Elenco compatto statistiche
+            st.markdown(f"""
+            - 🎮 **Total Sessions:** {sessions_stats['total_sessions']}
+            - 🏆 **Official Sessions:** {sessions_stats['official_sessions']}
+            - ❌ **Unofficial Sessions:** {sessions_stats['non_official_sessions']}
+            - 👥 **Unique Drivers:** {sessions_stats['unique_drivers']}
+            - 🏁 **Most Used Track:** {sessions_stats['most_used_track']}
+            - 📊 **Sessions on Most Used Track:** {sessions_stats['most_used_count']}
+            - 📍 **Last Session Track:** {sessions_stats['last_session_track']}
+            - 📅 **Last Session Date:** {last_date_str}
+            """)
 
     def get_sessions_statistics(self, date_from: date, date_to: date) -> Dict:
         """Ottiene statistiche sessioni per il periodo specificato - VERSIONE CORRETTA"""
@@ -2327,32 +2348,40 @@ class ACCWebDashboard:
             key="track_select"
         )
 
-        # Filtro per sessioni ufficiali/tutte
-        session_filter = st.radio(
-            "🎯 Session Filter:",
-            options=["🟢 Official Sessions Only", "📊 All Sessions"],
-            index=0,  # "Official Sessions Only" selezionato di default
-            horizontal=True,
-            key="session_filter_bestlap"
-        )
+        # Box informativo per record ufficiali con link social
+        social_config = self.config.get('social', {})
+        discord_url = social_config.get('discord', '')
+        simgrid_url = social_config.get('simgrid', '')
 
-        # Determina se filtrare solo sessioni ufficiali
-        only_official = (session_filter == "🟢 Official Sessions Only")
+        # Crea i link ai social in stile discreto
+        social_links = []
+        if simgrid_url:
+            social_links.append(f'<a href="{simgrid_url}" target="_blank" style="text-decoration: none; margin: 0 0.5rem;"><button style="background: #4a90e2; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.9rem; cursor: pointer; transition: opacity 0.2s;">🏆 SimGrid</button></a>')
+        if discord_url:
+            social_links.append(f'<a href="{discord_url}" target="_blank" style="text-decoration: none; margin: 0 0.5rem;"><button style="background: #7289da; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.9rem; cursor: pointer; transition: opacity 0.2s;">💬 Discord</button></a>')
+
+        if social_links:
+            st.markdown(f"""
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 3px solid #6c757d; margin: 1rem 0;">
+                <p style="color: #495057; margin: 0 0 0.5rem 0; font-size: 0.95rem; font-weight: 500;">
+                    ℹ️ Only registered drivers shown - Join the TFL by registering on SimGrid or joining our Discord server
+                </p>
+                <div style="text-align: center; margin-top: 0.8rem;">
+                    {''.join(social_links)}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
         if selected_track == "📊 General Summary":
             # Mostra riepilogo generale di tutte le piste
             st.markdown("---")
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.subheader("🏁 Track Records Summary")
-            with col2:
-                st.caption("🟢 Official Session • ⚪ Unofficial Session")
-            self.show_all_tracks_summary(only_official=only_official)
+            st.subheader("🏁 Track Records Summary")
+            self.show_all_tracks_summary()
 
         elif selected_track in tracks:
             # Mostra dettagli della pista specifica
             st.markdown("---")
-            self.show_track_details(selected_track, only_official=only_official)
+            self.show_track_details(selected_track)
     
     def get_tracks_list(self) -> List[str]:
         """Ottiene lista piste disponibili nel database"""
@@ -2370,10 +2399,10 @@ class ACCWebDashboard:
             st.error(f"❌ Errore nel recupero piste: {e}")
             return []
     
-    def show_all_tracks_summary(self, only_official: bool = False):
-        """Mostra riepilogo record per tutte le piste"""
+    def show_all_tracks_summary(self):
+        """Mostra riepilogo record per tutte le piste (solo competizioni ufficiali e piloti TFL)"""
 
-        summary_df = self.get_all_tracks_summary(only_official=only_official)
+        summary_df = self.get_all_tracks_summary()
         
         if summary_df.empty:
             st.warning("⚠️ No data available for tracks summary")
@@ -2397,21 +2426,24 @@ class ACCWebDashboard:
         
         # Nome pista senza decorazioni
         summary_display['Pista'] = summary_display['track_name']
-        # Formatta tipo sessione con indicatore ufficiale
-        summary_display['Tipo'] = summary_display.apply(
-            lambda row: self.format_session_type_with_official_indicator(
-                row['session_type'], row['competition_id']
-            ) if pd.notna(row['session_type']) else "N/A", axis=1
+
+        # Formatta colonna Competition: "FPx - nome_competizione - campionato"
+        summary_display['Competition'] = summary_display.apply(
+            lambda row: self.format_competition_info(
+                row['session_type'],
+                row.get('competition_name'),
+                row.get('championship_name')
+            ), axis=1
         )
-        
+
         # Seleziona colonne finali
-        columns_to_show = ['Pista', 'Record', 'driver_name', 'Data', 'Tipo']
+        columns_to_show = ['Pista', 'Record', 'driver_name', 'Data', 'Competition']
         column_names = {
             'Pista': 'Track',
             'Record': 'Record',
             'driver_name': 'Driver',
             'Data': 'Date',
-            'Tipo': 'Session Type'
+            'Competition': 'Competition'
         }
         
         final_display = summary_display[columns_to_show].copy()
@@ -2462,21 +2494,21 @@ class ACCWebDashboard:
         with col3:
             st.info(f"🎯 **{record_text}**")
     
-    def get_all_tracks_summary(self, only_official: bool = False) -> pd.DataFrame:
-        """Ottiene riepilogo record per tutte le piste"""
+    def get_all_tracks_summary(self) -> pd.DataFrame:
+        """Ottiene riepilogo record per tutte le piste (solo competizioni ufficiali e piloti TFL)"""
 
-        # Condizione aggiuntiva per filtrare solo sessioni ufficiali
-        official_filter = "AND s.competition_id IS NOT NULL" if only_official else ""
-
-        query = f'''
+        query = '''
             WITH track_records AS (
                 SELECT
                     s.track_name,
                     MIN(l.lap_time) as best_lap
                 FROM laps l
                 JOIN sessions s ON l.session_id = s.session_id
-                WHERE l.is_valid_for_best = 1 AND l.lap_time > 0
-                {official_filter}
+                JOIN drivers d ON l.driver_id = d.driver_id
+                WHERE l.is_valid_for_best = 1
+                  AND l.lap_time > 0
+                  AND s.competition_id IS NOT NULL
+                  AND d.trust_level > 0
                 GROUP BY s.track_name
             )
             SELECT
@@ -2485,13 +2517,18 @@ class ACCWebDashboard:
                 d.last_name as driver_name,
                 s.session_date,
                 s.session_type,
-                s.competition_id
+                s.competition_id,
+                c.name as competition_name,
+                ch.name as championship_name
             FROM track_records tr
             JOIN laps l ON tr.best_lap = l.lap_time
             JOIN sessions s ON l.session_id = s.session_id AND s.track_name = tr.track_name
             JOIN drivers d ON l.driver_id = d.driver_id
+            LEFT JOIN competitions c ON s.competition_id = c.competition_id
+            LEFT JOIN championships ch ON c.championship_id = ch.championship_id
             WHERE l.is_valid_for_best = 1
-            {official_filter}
+              AND s.competition_id IS NOT NULL
+              AND d.trust_level > 0
             GROUP BY tr.track_name
             ORDER BY tr.best_lap ASC
         '''
@@ -2516,16 +2553,35 @@ class ACCWebDashboard:
         """Formatta tipo sessione con indicatore per sessioni ufficiali"""
         import pandas as pd
         formatted_type = self.format_session_type(session_type)
-        
+
         # Aggiunge pallino verde per sessioni ufficiali, grigio per non ufficiali
         if competition_id is not None and not pd.isna(competition_id):
             return f"🟢 {formatted_type}"
         else:
             return f"⚪ {formatted_type}"
 
+    def format_competition_info(self, session_type: str, competition_name, championship_name) -> str:
+        """Formatta info competizione: FPx - nome_competizione - campionato"""
+        import pandas as pd
 
-    def show_track_details(self, track_name: str, only_official: bool = False):
-        """Mostra dettagli completi per la pista selezionata"""
+        parts = []
+
+        # Aggiungi session type breve (FPx, Qx, Rx)
+        if session_type and pd.notna(session_type):
+            parts.append(session_type)
+
+        # Aggiungi competition name
+        if competition_name and pd.notna(competition_name):
+            parts.append(competition_name)
+
+        # Aggiungi championship name
+        if championship_name and pd.notna(championship_name):
+            parts.append(championship_name)
+
+        return " - ".join(parts) if parts else "N/A"
+
+    def show_track_details(self, track_name: str):
+        """Mostra dettagli completi per la pista selezionata (solo competizioni ufficiali e piloti TFL)"""
 
         # Header pista
         st.markdown(f"""
@@ -2535,133 +2591,33 @@ class ACCWebDashboard:
         """, unsafe_allow_html=True)
 
         # Ottieni statistiche generali
-        track_stats = self.get_track_statistics(track_name, only_official=only_official)
-        
+        track_stats = self.get_track_statistics(track_name)
+
         if not any(track_stats.values()):
             st.warning("⚠️ No data available for this track")
             return
-        
-        # Prima riga: Statistiche generali
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{track_stats['unique_drivers']}</p>
-                <p class="metric-label">👥 Unique Drivers</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{track_stats['total_sessions']}</p>
-                <p class="metric-label">🎮 Total Sessions</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            official_sessions = track_stats.get('official_sessions', 0)
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{official_sessions}</p>
-                <p class="metric-label">🏆 Total Official Sessions</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            avg_time_str = self.format_lap_time(track_stats['avg_time']) if track_stats['avg_time'] else "N/A"
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.8rem;">{avg_time_str}</p>
-                <p class="metric-label">📈 Average Time</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Seconda riga: Info record e media
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            record_holder = track_stats.get('record_holder', 'N/A')
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.5rem;">{record_holder}</p>
-                <p class="metric-label">🏆 Record Holder</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            best_time_str = self.format_lap_time(track_stats['best_time']) if track_stats['best_time'] else "N/A"
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.8rem;">{best_time_str}</p>
-                <p class="metric-label">⚡ Absolute Record</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            # Record date
-            record_date = track_stats.get('record_date')
-            if record_date:
-                try:
-                    record_date_obj = datetime.fromisoformat(record_date.replace('Z', '+00:00'))
-                    record_date_formatted = record_date_obj.strftime('%d/%m/%Y')
-                except:
-                    record_date_formatted = "N/A"
-            else:
-                record_date_formatted = "N/A"
-            
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.4rem;">{record_date_formatted}</p>
-                <p class="metric-label">📅 Record Date</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            # Last session on this track
-            last_session = track_stats.get('last_session_date')
-            if last_session:
-                try:
-                    last_date = datetime.fromisoformat(last_session.replace('Z', '+00:00'))
-                    last_text = last_date.strftime('%d/%m/%Y')
-                except:
-                    last_text = "N/A"
-            else:
-                last_text = "N/A"
-            
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.4rem;">{last_text}</p>
-                <p class="metric-label">📅 Last Session Date</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
+
         # Classifica Best Laps
         st.markdown("---")
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.subheader("🏆 Best Laps Leaderboard by Driver")
-        with col2:
-            st.caption("🟢 Official Session • ⚪ Unofficial Session")
+        st.subheader("🏆 Best Laps Leaderboard by Driver")
 
-        leaderboard_df = self.get_track_leaderboard(track_name, only_official=only_official)
-        
+        leaderboard_df = self.get_track_leaderboard(track_name)
+
         if not leaderboard_df.empty:
             # Prepara display leaderboard
             leaderboard_display = leaderboard_df.copy()
-            
+
             # Aggiungi medaglie per i primi 3
             leaderboard_display['Posizione'] = leaderboard_display.reset_index().index + 1
             leaderboard_display['Pos'] = leaderboard_display['Posizione'].apply(
                 lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
             )
-            
+
             # Formatta tempi
             leaderboard_display['Best Time'] = leaderboard_display['best_lap'].apply(
                 lambda x: self.format_lap_time(x) if pd.notna(x) else "N/A"
             )
-            
+
             # Calcola gap dal leader
             if len(leaderboard_display) > 1:
                 best_time = leaderboard_display.iloc[0]['best_lap']
@@ -2670,33 +2626,35 @@ class ACCWebDashboard:
                 )
             else:
                 leaderboard_display['Gap'] = "-"
-            
+
             # Formatta data
             leaderboard_display['Record Date'] = leaderboard_display['session_date'].apply(
                 lambda x: self.format_session_date(x) if pd.notna(x) else "N/A"
             )
-            
-            # Formatta tipo sessione con indicatore ufficiale
-            leaderboard_display['Session Type'] = leaderboard_display.apply(
-                lambda row: self.format_session_type_with_official_indicator(
-                    row['session_type'], row['competition_id']
-                ) if pd.notna(row['session_type']) else "N/A", axis=1
+
+            # Formatta colonna Competition: "FPx - nome_competizione - campionato"
+            leaderboard_display['Competition'] = leaderboard_display.apply(
+                lambda row: self.format_competition_info(
+                    row['session_type'],
+                    row.get('competition_name'),
+                    row.get('championship_name')
+                ), axis=1
             )
-            
+
             # Seleziona colonne finali
-            columns_to_show = ['Pos', 'driver_name', 'Best Time', 'Gap', 'Record Date', 'Session Type']
+            columns_to_show = ['Pos', 'driver_name', 'Best Time', 'Gap', 'Record Date', 'Competition']
             column_names = {
                 'Pos': 'Pos',
                 'driver_name': 'Pilota',
                 'Best Time': 'Best Time',
                 'Gap': 'Gap',
                 'Record Date': 'Record Date',
-                'Session Type': 'Session Type'
+                'Competition': 'Competition'
             }
-            
+
             final_display = leaderboard_display[columns_to_show].copy()
             final_display.columns = [column_names[col] for col in columns_to_show]
-            
+
             # Mostra tabella con evidenziazione primi 3
             st.dataframe(
                 final_display,
@@ -2704,26 +2662,62 @@ class ACCWebDashboard:
                 hide_index=True,
                 height=500
             )
-            
-        
+
         else:
             st.warning("⚠️ No data available for leaderboard")
-        
-        # Grafici
-        st.markdown("---")
-        self.show_track_charts(track_name, leaderboard_df)    
 
-    def get_track_statistics(self, track_name: str, only_official: bool = False) -> Dict:
-        """Ottiene statistiche generali per la pista"""
+        # Statistiche pista (dopo leaderboard)
+        st.markdown("---")
+        st.subheader("📊 Track Statistics")
+
+        # Prepara valori
+        record_holder = track_stats.get('record_holder', 'N/A')
+        best_time_str = self.format_lap_time(track_stats['best_time']) if track_stats['best_time'] else "N/A"
+        avg_time_str = self.format_lap_time(track_stats['avg_time']) if track_stats['avg_time'] else "N/A"
+        official_sessions = track_stats.get('official_sessions', 0)
+
+        # Record date
+        record_date = track_stats.get('record_date')
+        if record_date:
+            try:
+                record_date_obj = datetime.fromisoformat(record_date.replace('Z', '+00:00'))
+                record_date_formatted = record_date_obj.strftime('%d/%m/%Y')
+            except:
+                record_date_formatted = "N/A"
+        else:
+            record_date_formatted = "N/A"
+
+        # Last session date
+        last_session = track_stats.get('last_session_date')
+        if last_session:
+            try:
+                last_date = datetime.fromisoformat(last_session.replace('Z', '+00:00'))
+                last_text = last_date.strftime('%d/%m/%Y')
+            except:
+                last_text = "N/A"
+        else:
+            last_text = "N/A"
+
+        # Elenco compatto statistiche
+        st.markdown(f"""
+        - 🏆 **Record Holder:** {record_holder}
+        - ⚡ **Absolute Record:** {best_time_str}
+        - 📅 **Record Date:** {record_date_formatted}
+        - 📈 **Average Time:** {avg_time_str}
+        - 👥 **Unique Drivers:** {track_stats['unique_drivers']}
+        - 🎮 **Total Sessions:** {track_stats['total_sessions']}
+        - 🏆 **Total Official Sessions:** {official_sessions}
+        - 📅 **Last Session Date:** {last_text}
+        """)    
+
+    def get_track_statistics(self, track_name: str) -> Dict:
+        """Ottiene statistiche generali per la pista (solo competizioni ufficiali e piloti TFL)"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            # Condizione aggiuntiva per filtrare solo sessioni ufficiali
-            official_filter = "AND s.competition_id IS NOT NULL" if only_official else ""
-
             # Statistiche generali
-            query = f'''
+            query = '''
                 SELECT
                     COUNT(DISTINCT s.session_id) as total_sessions,
                     COUNT(DISTINCT l.driver_id) as unique_drivers,
@@ -2734,8 +2728,12 @@ class ACCWebDashboard:
                     COUNT(DISTINCT CASE WHEN s.competition_id IS NOT NULL THEN s.session_id END) as official_sessions
                 FROM sessions s
                 LEFT JOIN laps l ON s.session_id = l.session_id
-                WHERE s.track_name = ? AND l.is_valid_for_best = 1 AND l.lap_time > 0
-                {official_filter}
+                LEFT JOIN drivers d ON l.driver_id = d.driver_id
+                WHERE s.track_name = ?
+                  AND l.is_valid_for_best = 1
+                  AND l.lap_time > 0
+                  AND s.competition_id IS NOT NULL
+                  AND d.trust_level > 0
             '''
 
             cursor.execute(query, (track_name,))
@@ -2745,13 +2743,16 @@ class ACCWebDashboard:
                 sessions, drivers, laps, best, avg, last_session, official_sessions = result
 
                 # Chi detiene il record e quando
-                record_query = f'''
+                record_query = '''
                     SELECT d.last_name, s.session_date
                     FROM laps l
                     JOIN drivers d ON l.driver_id = d.driver_id
                     JOIN sessions s ON l.session_id = s.session_id
-                    WHERE s.track_name = ? AND l.lap_time = ? AND l.is_valid_for_best = 1
-                    {official_filter}
+                    WHERE s.track_name = ?
+                      AND l.lap_time = ?
+                      AND l.is_valid_for_best = 1
+                      AND s.competition_id IS NOT NULL
+                      AND d.trust_level > 0
                     LIMIT 1
                 '''
 
@@ -2795,21 +2796,22 @@ class ACCWebDashboard:
             st.error(f"❌ Errore nel recupero statistiche pista: {e}")
             return {}
     
-    def get_track_leaderboard(self, track_name: str, only_official: bool = False) -> pd.DataFrame:
-        """Ottiene classifica best laps per pista"""
+    def get_track_leaderboard(self, track_name: str) -> pd.DataFrame:
+        """Ottiene classifica best laps per pista (solo competizioni ufficiali e piloti TFL)"""
 
-        # Condizione aggiuntiva per filtrare solo sessioni ufficiali
-        official_filter = "AND s.competition_id IS NOT NULL" if only_official else ""
-
-        query = f'''
+        query = '''
             WITH driver_best_laps AS (
                 SELECT
                     l.driver_id,
                     MIN(l.lap_time) as best_lap
                 FROM laps l
                 JOIN sessions s ON l.session_id = s.session_id
-                WHERE s.track_name = ? AND l.is_valid_for_best = 1 AND l.lap_time > 0
-                {official_filter}
+                JOIN drivers d ON l.driver_id = d.driver_id
+                WHERE s.track_name = ?
+                  AND l.is_valid_for_best = 1
+                  AND l.lap_time > 0
+                  AND s.competition_id IS NOT NULL
+                  AND d.trust_level > 0
                 GROUP BY l.driver_id
             )
             SELECT
@@ -2818,13 +2820,19 @@ class ACCWebDashboard:
                 dbl.best_lap,
                 s.session_date,
                 s.session_type,
-                s.competition_id
+                s.competition_id,
+                c.name as competition_name,
+                ch.name as championship_name
             FROM driver_best_laps dbl
             JOIN laps l ON l.driver_id = dbl.driver_id AND l.lap_time = dbl.best_lap
             JOIN sessions s ON l.session_id = s.session_id
             JOIN drivers d ON dbl.driver_id = d.driver_id
-            WHERE s.track_name = ? AND l.is_valid_for_best = 1
-            {official_filter}
+            LEFT JOIN competitions c ON s.competition_id = c.competition_id
+            LEFT JOIN championships ch ON c.championship_id = ch.championship_id
+            WHERE s.track_name = ?
+              AND l.is_valid_for_best = 1
+              AND s.competition_id IS NOT NULL
+              AND d.trust_level > 0
             ORDER BY dbl.best_lap ASC
             LIMIT 50
         '''
@@ -2871,19 +2879,24 @@ class ACCWebDashboard:
                 st.info("Insufficient data for performance chart")
     
     def get_track_evolution_data(self, track_name: str) -> pd.DataFrame:
-        """Ottiene migliori giri per ogni pilota ordinati per performance"""
-        
+        """Ottiene migliori giri per ogni pilota ordinati per performance (solo competizioni ufficiali e piloti TFL)"""
+
         query = '''
             WITH driver_best_laps AS (
-                SELECT 
+                SELECT
                     l.driver_id,
                     MIN(l.lap_time) as best_lap
                 FROM laps l
                 JOIN sessions s ON l.session_id = s.session_id
-                WHERE s.track_name = ? AND l.is_valid_for_best = 1 AND l.lap_time > 0
+                JOIN drivers d ON l.driver_id = d.driver_id
+                WHERE s.track_name = ?
+                  AND l.is_valid_for_best = 1
+                  AND l.lap_time > 0
+                  AND s.competition_id IS NOT NULL
+                  AND d.trust_level > 0
                 GROUP BY l.driver_id
             )
-            SELECT 
+            SELECT
                 d.last_name as driver_name,
                 dbl.best_lap,
                 s.session_date,
@@ -2892,11 +2905,14 @@ class ACCWebDashboard:
             JOIN laps l ON l.driver_id = dbl.driver_id AND l.lap_time = dbl.best_lap
             JOIN sessions s ON l.session_id = s.session_id
             JOIN drivers d ON dbl.driver_id = d.driver_id
-            WHERE s.track_name = ? AND l.is_valid_for_best = 1
+            WHERE s.track_name = ?
+              AND l.is_valid_for_best = 1
+              AND s.competition_id IS NOT NULL
+              AND d.trust_level > 0
             ORDER BY dbl.best_lap ASC
             LIMIT 20
         '''
-        
+
         df = self.safe_sql_query(query, [track_name, track_name])
         
         if not df.empty:
@@ -3566,8 +3582,8 @@ def main():
                 "🌟 Leagues",
                 "🏆 Championships",
                 "🎉 Official 4Fun",
-                "⚡ Best Lap",
                 "📅 Sessions",
+                "⚡ Best Lap",
                 "👥 Drivers",
                 "📈 Statistics"
             ]
@@ -3586,11 +3602,11 @@ def main():
         elif page == "🎉 Official 4Fun":
             dashboard.show_4fun_report()
 
-        elif page == "⚡ Best Lap":
-            dashboard.show_best_laps_report()
-
         elif page == "📅 Sessions":
             dashboard.show_sessions_report()
+
+        elif page == "⚡ Best Lap":
+            dashboard.show_best_laps_report()
 
         elif page == "👥 Drivers":
             dashboard.show_drivers_report()
