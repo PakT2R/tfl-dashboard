@@ -582,7 +582,7 @@ class ACCWebDashboard:
             cursor = conn.cursor()
             
             cursor.execute("""
-                SELECT 
+                SELECT
                     competition_id,
                     name,
                     track_name,
@@ -593,11 +593,9 @@ class ACCWebDashboard:
                     is_completed
                 FROM competitions
                 WHERE championship_id = ?
-                ORDER BY 
-                    is_completed DESC,
+                ORDER BY
                     CASE WHEN date_start IS NULL THEN 1 ELSE 0 END,
-                    CASE WHEN is_completed = 1 THEN date_start END DESC,
-                    CASE WHEN is_completed = 0 THEN date_start END ASC,
+                    date_start DESC,
                     round_number DESC
             """, (championship_id,))
             
@@ -999,9 +997,8 @@ class ACCWebDashboard:
                     description
                 FROM leagues
                 ORDER BY
-                    is_completed ASC,
-                    CASE WHEN end_date IS NULL THEN 1 ELSE 0 END,
-                    end_date DESC,
+                    CASE WHEN start_date IS NULL THEN 1 ELSE 0 END,
+                    start_date DESC,
                     league_id DESC
             """)
 
@@ -1015,6 +1012,7 @@ class ACCWebDashboard:
             # Prepara opzioni per selectbox
             league_options = []
             league_map = {}
+            default_league_index = 0  # Default: prima league
 
             for league_id, name, season, start_date, end_date, total_tiers, is_completed, description in leagues:
                 # Formato display
@@ -1024,10 +1022,27 @@ class ACCWebDashboard:
                 league_options.append(display_name)
                 league_map[display_name] = league_id
 
+            # Trova default index: più recente completata, o prima non completata
+            first_completed_idx = None
+            first_not_completed_idx = None
+
+            for idx, (league_id, name, season, start_date, end_date, total_tiers, is_completed, description) in enumerate(leagues):
+                if is_completed and first_completed_idx is None:
+                    first_completed_idx = idx
+                if not is_completed and first_not_completed_idx is None:
+                    first_not_completed_idx = idx
+
+            # Seleziona la più recente completata, altrimenti la prima non completata
+            if first_completed_idx is not None:
+                default_league_index = first_completed_idx
+            elif first_not_completed_idx is not None:
+                default_league_index = first_not_completed_idx
+
             # Selectbox league
             selected_league_display = st.selectbox(
                 "Select a League:",
                 league_options,
+                index=default_league_index,
                 key="league_selector"
             )
 
@@ -1146,7 +1161,7 @@ class ACCWebDashboard:
 
                 # Selezione tier (championships)
                 st.markdown("---")
-                st.subheader("🏆 League Tiers (Championships)")
+                st.subheader("🏆 League Tiers")
 
                 # Ottieni championships (tier) della lega
                 cursor.execute("""
@@ -1160,7 +1175,10 @@ class ACCWebDashboard:
                         description
                     FROM championships
                     WHERE league_id = ? AND championship_type = 'tier'
-                    ORDER BY tier_number ASC
+                    ORDER BY
+                        CASE WHEN start_date IS NULL THEN 1 ELSE 0 END,
+                        start_date DESC,
+                        championship_id DESC
                 """, (selected_league_id,))
 
                 tier_championships = cursor.fetchall()
@@ -1169,9 +1187,8 @@ class ACCWebDashboard:
                     # Prepara opzioni per selectbox tier
                     tier_options = ["Select a tier..."]
                     tier_map = {}
-
-                    # Trova il primo tier completato o il primo in corso
                     default_tier_index = 1  # Default al primo tier (dopo "Select a tier...")
+
                     for idx, (champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc) in enumerate(tier_championships):
                         # Formato display
                         status_str = " ✅" if is_completed else " 🔄"
@@ -1181,13 +1198,25 @@ class ACCWebDashboard:
                         tier_options.append(display_name)
                         tier_map[display_name] = champ_id
 
-                        # Se è il primo completato, usa questo come default
-                        if is_completed and default_tier_index == 1:
-                            default_tier_index = idx + 1  # +1 perché la prima opzione è "Select a tier..."
+                    # Trova default index: più recente completata, o prima non completata
+                    first_completed_idx = None
+                    first_not_completed_idx = None
+
+                    for idx, (champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc) in enumerate(tier_championships):
+                        if is_completed and first_completed_idx is None:
+                            first_completed_idx = idx + 1  # +1 per "Select a tier..."
+                        if not is_completed and first_not_completed_idx is None:
+                            first_not_completed_idx = idx + 1
+
+                    # Seleziona la più recente completata, altrimenti la prima non completata
+                    if first_completed_idx is not None:
+                        default_tier_index = first_completed_idx
+                    elif first_not_completed_idx is not None:
+                        default_tier_index = first_not_completed_idx
 
                     # Selectbox tier
                     selected_tier = st.selectbox(
-                        "🏆 Select Tier Championship:",
+                        "🏆 Select Tier:",
                         options=tier_options,
                         index=default_tier_index,
                         key="tier_select"
@@ -1222,7 +1251,7 @@ class ACCWebDashboard:
                             st.markdown(tier_header, unsafe_allow_html=True)
 
                             # Classifica tier championship
-                            st.subheader("📊 Tier Championship Leaderboard")
+                            st.subheader("📊 Tier Leaderboard")
                             standings_df = self.get_championship_standings(tier_championship_id)
 
                             if not standings_df.empty:
@@ -1453,7 +1482,7 @@ class ACCWebDashboard:
     
     def show_competition_selection(self, championship_id: int):
         """Mostra selezione e dettagli competizione"""
-        st.subheader("🏁 Championship Competitions")
+        st.subheader("🏁 Tier / Championship Competitions")
         
         # Ottieni competizioni
         competitions = self.get_championship_competitions(championship_id)
@@ -1465,6 +1494,7 @@ class ACCWebDashboard:
         # Prepara opzioni per selectbox
         competition_options = ["Select a competition..."]
         competition_map = {}
+        default_index = 1  # Default: prima competizione
 
         for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed) in enumerate(competitions):
             # Formato display
@@ -1477,11 +1507,27 @@ class ACCWebDashboard:
             competition_options.append(display_name)
             competition_map[display_name] = comp_id
 
-        # Selectbox competizione - seleziona sempre la prima (già ordinata correttamente dalla query)
+        # Trova default index: più recente completata, o prima non completata
+        first_completed_idx = None
+        first_not_completed_idx = None
+
+        for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed) in enumerate(competitions):
+            if is_completed and first_completed_idx is None:
+                first_completed_idx = idx + 1  # +1 per "Select a competition..."
+            if not is_completed and first_not_completed_idx is None:
+                first_not_completed_idx = idx + 1
+
+        # Seleziona la più recente completata, altrimenti la prima non completata
+        if first_completed_idx is not None:
+            default_index = first_completed_idx
+        elif first_not_completed_idx is not None:
+            default_index = first_not_completed_idx
+
+        # Selectbox competizione
         selected_competition = st.selectbox(
             "🏁 Select Competition:",
             options=competition_options,
-            index=1,  # Seleziona la prima competizione reale (dopo "Select a competition...")
+            index=default_index,
             key="competition_select"
         )
         
