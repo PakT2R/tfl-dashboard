@@ -11,6 +11,7 @@ import json
 import pandas as pd
 import os
 from datetime import datetime, timedelta, date
+from zoneinfo import ZoneInfo
 from pathlib import Path
 import plotly.express as px
 import plotly.graph_objects as go
@@ -1902,9 +1903,9 @@ class ACCWebDashboard:
     def show_sessions_report(self):
         """Mostra il report Sessions con filtri e statistiche"""
         st.header("📅 Sessions")
-        
-        # Calcola date di default (ultima settimana)
-        today = datetime.now().date()
+
+        # Calcola date di default (ultima settimana) usando timezone italiana
+        today = datetime.now(ZoneInfo("Europe/Rome")).date()
         week_ago = today - timedelta(days=7)
         
         # Filtri data in colonne
