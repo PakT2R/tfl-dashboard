@@ -1255,17 +1255,23 @@ class ACCWebDashboard:
                             standings_df = self.get_championship_standings(tier_championship_id)
 
                             if not standings_df.empty:
-                                # Ottieni drop_worst_results per questo championship
+                                # Ottieni drop_worst_results e total_rounds per questo championship
                                 cursor.execute("""
-                                    SELECT COALESCE(ps.drop_worst_results, 0) as drop_worst
+                                    SELECT COALESCE(ps.drop_worst_results, 0) as drop_worst,
+                                           ch.total_rounds
                                     FROM competitions c
                                     LEFT JOIN points_systems ps ON c.points_system_json = ps.name
+                                    JOIN championships ch ON c.championship_id = ch.championship_id
                                     WHERE c.championship_id = ?
                                     LIMIT 1
                                 """, (tier_championship_id,))
 
-                                drop_worst_result = cursor.fetchone()
-                                drop_worst = drop_worst_result[0] if drop_worst_result else 0
+                                result = cursor.fetchone()
+                                drop_worst = result[0] if result else 0
+                                total_rounds = result[1] if result and result[1] else 0
+
+                                # Calcola il numero minimo di gare che vengono conteggiate
+                                counted_races = max(0, total_rounds - drop_worst) if total_rounds > 0 else 0
 
                                 # Formatta classifica per visualizzazione
                                 standings_display = standings_df.copy()
@@ -1282,7 +1288,7 @@ class ACCWebDashboard:
 
                                     if pd.notna(dropped_pts) and dropped_pts > 0:
                                         return f"-{dropped_pts:.1f}"
-                                    elif races > drop_worst and drop_worst > 0:
+                                    elif counted_races > 0 and races > counted_races:
                                         return "0.0"
                                     else:
                                         return "-"
@@ -1561,20 +1567,26 @@ class ACCWebDashboard:
                 standings_df = self.get_championship_standings(championship_id)
 
                 if not standings_df.empty:
-                    # Ottieni drop_worst_results per questo championship
+                    # Ottieni drop_worst_results e total_rounds per questo championship
                     conn_temp = sqlite3.connect(self.db_path)
                     cursor_temp = conn_temp.cursor()
                     cursor_temp.execute("""
-                        SELECT COALESCE(ps.drop_worst_results, 0) as drop_worst
+                        SELECT COALESCE(ps.drop_worst_results, 0) as drop_worst,
+                               ch.total_rounds
                         FROM competitions c
                         LEFT JOIN points_systems ps ON c.points_system_json = ps.name
+                        JOIN championships ch ON c.championship_id = ch.championship_id
                         WHERE c.championship_id = ?
                         LIMIT 1
                     """, (championship_id,))
 
-                    drop_worst_result = cursor_temp.fetchone()
-                    drop_worst = drop_worst_result[0] if drop_worst_result else 0
+                    result = cursor_temp.fetchone()
+                    drop_worst = result[0] if result else 0
+                    total_rounds = result[1] if result and result[1] else 0
                     conn_temp.close()
+
+                    # Calcola il numero minimo di gare che vengono conteggiate
+                    counted_races = max(0, total_rounds - drop_worst) if total_rounds > 0 else 0
 
                     # Formatta classifica per visualizzazione
                     standings_display = standings_df.copy()
@@ -1591,7 +1603,7 @@ class ACCWebDashboard:
 
                         if pd.notna(dropped_pts) and dropped_pts > 0:
                             return f"-{dropped_pts:.1f}"
-                        elif races > drop_worst and drop_worst > 0:
+                        elif counted_races > 0 and races > counted_races:
                             return "0.0"
                         else:
                             return "-"
