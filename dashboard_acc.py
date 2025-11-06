@@ -1255,6 +1255,18 @@ class ACCWebDashboard:
                             standings_df = self.get_championship_standings(tier_championship_id)
 
                             if not standings_df.empty:
+                                # Ottieni drop_worst_results per questo championship
+                                cursor.execute("""
+                                    SELECT COALESCE(ps.drop_worst_results, 0) as drop_worst
+                                    FROM competitions c
+                                    LEFT JOIN points_systems ps ON c.points_system_json = ps.name
+                                    WHERE c.championship_id = ?
+                                    LIMIT 1
+                                """, (tier_championship_id,))
+
+                                drop_worst_result = cursor.fetchone()
+                                drop_worst = drop_worst_result[0] if drop_worst_result else 0
+
                                 # Formatta classifica per visualizzazione
                                 standings_display = standings_df.copy()
 
@@ -1263,6 +1275,20 @@ class ACCWebDashboard:
                                     lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
                                 )
 
+                                # Formatta points_dropped PRIMA di convertire competitions_participated in stringa
+                                def format_dropped_points(row):
+                                    races = row['competitions_participated']
+                                    dropped_pts = row['points_dropped']
+
+                                    if pd.notna(dropped_pts) and dropped_pts > 0:
+                                        return f"-{dropped_pts:.1f}"
+                                    elif races > drop_worst and drop_worst > 0:
+                                        return "0.0"
+                                    else:
+                                        return "-"
+
+                                standings_display['points_dropped'] = standings_display.apply(format_dropped_points, axis=1)
+
                                 # Formatta i valori numerici - usa "-" per zero/null
                                 standings_display['competitions_participated'] = standings_display['competitions_participated'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                                 standings_display['wins'] = standings_display['wins'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
@@ -1270,7 +1296,6 @@ class ACCWebDashboard:
                                 standings_display['poles'] = standings_display['poles'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                                 standings_display['fastest_laps'] = standings_display['fastest_laps'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                                 standings_display['gross_points'] = standings_display['gross_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
-                                standings_display['points_dropped'] = standings_display['points_dropped'].apply(lambda x: f"-{x:.1f}" if pd.notna(x) and x > 0 else "-")
                                 standings_display['base_points'] = standings_display['base_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
                                 standings_display['participation_multiplier'] = standings_display['participation_multiplier'].apply(lambda x: f"{x:.2f}" if pd.notna(x) and x != 1.0 else "-")
                                 standings_display['participation_bonus'] = standings_display['participation_bonus'].apply(lambda x: f"+{x:.1f}" if pd.notna(x) and x > 0 else "-")
@@ -1328,6 +1353,134 @@ class ACCWebDashboard:
                             self.show_competition_selection(tier_championship_id)
                 else:
                     st.info("ℹ️ No tier championships found for this league")
+
+                # Grafico andamento partecipanti giornalieri
+                st.markdown("---")
+                st.subheader("📈 Daily Participation Trend")
+
+                try:
+                    # Query per contare partecipanti unici per giorno (separati per registrati e guest)
+                    cursor.execute("""
+                        SELECT
+                            SUBSTR(s.filename, 1, 6) as date_str,
+                            COUNT(DISTINCT CASE WHEN d.trust_level > 0 THEN sr.driver_id END) as registered_participants,
+                            COUNT(DISTINCT CASE WHEN d.trust_level = 0 THEN sr.driver_id END) as guest_participants
+                        FROM sessions s
+                        JOIN session_results sr ON s.session_id = sr.session_id
+                        JOIN drivers d ON sr.driver_id = d.driver_id
+                        WHERE s.competition_id IN (
+                            SELECT competition_id
+                            FROM competitions
+                            WHERE championship_id IN (
+                                SELECT championship_id
+                                FROM championships
+                                WHERE league_id = ?
+                            )
+                        )
+                        GROUP BY SUBSTR(s.filename, 1, 6)
+                        ORDER BY date_str ASC
+                    """, (selected_league_id,))
+
+                    participation_data = cursor.fetchall()
+
+                    if participation_data:
+                        # Converti i dati per il grafico
+                        dates = []
+                        registered = []
+                        guests = []
+
+                        for date_str, reg_count, guest_count in participation_data:
+                            # Converti YYMMDD in formato leggibile
+                            try:
+                                # Aggiungi "20" per completare l'anno (es. 251015 -> 20251015)
+                                full_date_str = "20" + date_str
+                                date_obj = datetime.strptime(full_date_str, "%Y%m%d")
+                                formatted_date = date_obj.strftime("%d/%m/%Y")
+                                dates.append(formatted_date)
+                                registered.append(reg_count if reg_count else 0)
+                                guests.append(guest_count if guest_count else 0)
+                            except:
+                                # Se la conversione fallisce, usa la stringa originale
+                                dates.append(date_str)
+                                registered.append(reg_count if reg_count else 0)
+                                guests.append(guest_count if guest_count else 0)
+
+                        # Crea il grafico con Plotly
+                        fig = go.Figure()
+
+                        # Linea per piloti registrati
+                        fig.add_trace(go.Scatter(
+                            x=dates,
+                            y=registered,
+                            mode='lines+markers',
+                            name='Registered Drivers',
+                            line=dict(color='#28a745', width=3),
+                            marker=dict(size=8, color='#28a745'),
+                            hovertemplate='<b>Registered:</b> %{y}<extra></extra>'
+                        ))
+
+                        # Linea per piloti guest
+                        fig.add_trace(go.Scatter(
+                            x=dates,
+                            y=guests,
+                            mode='lines+markers',
+                            name='Guest Drivers',
+                            line=dict(color='#ffc107', width=3, dash='dash'),
+                            marker=dict(size=8, color='#ffc107', symbol='diamond'),
+                            hovertemplate='<b>Guests:</b> %{y}<extra></extra>'
+                        ))
+
+                        fig.update_layout(
+                            title={
+                                'text': 'Daily Unique Participants (Registered vs Guests)',
+                                'x': 0.5,
+                                'xanchor': 'center'
+                            },
+                            xaxis_title="Date",
+                            yaxis_title="Number of Unique Participants",
+                            hovermode='x unified',
+                            template='plotly_dark',
+                            height=500,
+                            showlegend=True,
+                            legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.02,
+                                xanchor="right",
+                                x=1
+                            ),
+                            xaxis=dict(
+                                tickangle=-45,
+                                tickmode='auto',
+                                nticks=20
+                            ),
+                            yaxis=dict(
+                                rangemode='tozero'
+                            )
+                        )
+
+                        st.plotly_chart(fig, use_container_width=True)
+
+                        # Statistiche aggiuntive
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            avg_registered = sum(registered) / len(registered)
+                            st.metric("Avg Registered", f"{avg_registered:.1f}")
+                        with col2:
+                            avg_guests = sum(guests) / len(guests)
+                            st.metric("Avg Guests", f"{avg_guests:.1f}")
+                        with col3:
+                            max_registered = max(registered)
+                            st.metric("Peak Registered", f"{max_registered}")
+                        with col4:
+                            max_guests = max(guests)
+                            st.metric("Peak Guests", f"{max_guests}")
+
+                    else:
+                        st.info("ℹ️ No participation data available for this league yet")
+
+                except Exception as e:
+                    st.error(f"❌ Error loading participation trend: {e}")
 
             conn.close()
 
@@ -1406,8 +1559,23 @@ class ACCWebDashboard:
                 # Classifica campionato
                 st.subheader("📊 Championship Leaderboard")
                 standings_df = self.get_championship_standings(championship_id)
-                
+
                 if not standings_df.empty:
+                    # Ottieni drop_worst_results per questo championship
+                    conn_temp = sqlite3.connect(self.db_path)
+                    cursor_temp = conn_temp.cursor()
+                    cursor_temp.execute("""
+                        SELECT COALESCE(ps.drop_worst_results, 0) as drop_worst
+                        FROM competitions c
+                        LEFT JOIN points_systems ps ON c.points_system_json = ps.name
+                        WHERE c.championship_id = ?
+                        LIMIT 1
+                    """, (championship_id,))
+
+                    drop_worst_result = cursor_temp.fetchone()
+                    drop_worst = drop_worst_result[0] if drop_worst_result else 0
+                    conn_temp.close()
+
                     # Formatta classifica per visualizzazione
                     standings_display = standings_df.copy()
 
@@ -1416,6 +1584,20 @@ class ACCWebDashboard:
                         lambda x: "🥇" if x == 1 else "🥈" if x == 2 else "🥉" if x == 3 else str(x)
                     )
 
+                    # Formatta points_dropped PRIMA di convertire competitions_participated in stringa
+                    def format_dropped_points(row):
+                        races = row['competitions_participated']
+                        dropped_pts = row['points_dropped']
+
+                        if pd.notna(dropped_pts) and dropped_pts > 0:
+                            return f"-{dropped_pts:.1f}"
+                        elif races > drop_worst and drop_worst > 0:
+                            return "0.0"
+                        else:
+                            return "-"
+
+                    standings_display['points_dropped'] = standings_display.apply(format_dropped_points, axis=1)
+
                     # Formatta i valori numerici - usa "-" per zero/null
                     standings_display['competitions_participated'] = standings_display['competitions_participated'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                     standings_display['wins'] = standings_display['wins'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
@@ -1423,7 +1605,6 @@ class ACCWebDashboard:
                     standings_display['poles'] = standings_display['poles'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                     standings_display['fastest_laps'] = standings_display['fastest_laps'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                     standings_display['gross_points'] = standings_display['gross_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
-                    standings_display['points_dropped'] = standings_display['points_dropped'].apply(lambda x: f"-{x:.1f}" if pd.notna(x) and x > 0 else "-")
                     standings_display['base_points'] = standings_display['base_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
                     standings_display['participation_multiplier'] = standings_display['participation_multiplier'].apply(lambda x: f"{x:.2f}" if pd.notna(x) and x != 1.0 else "-")
                     standings_display['participation_bonus'] = standings_display['participation_bonus'].apply(lambda x: f"+{x:.1f}" if pd.notna(x) and x > 0 else "-")
