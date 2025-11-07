@@ -1401,25 +1401,25 @@ class ACCWebDashboard:
                         # Crea il grafico con Plotly
                         fig = go.Figure()
 
-                        # Linea per piloti registrati
+                        # Linea per piloti registrati - BLU SOLIDA
                         fig.add_trace(go.Scatter(
                             x=dates,
                             y=registered,
                             mode='lines+markers',
                             name='Registered Drivers',
-                            line=dict(color='#28a745', width=3),
-                            marker=dict(size=8, color='#28a745'),
+                            line=dict(color='#007bff', width=3),
+                            marker=dict(size=8, color='#007bff'),
                             hovertemplate='<b>Registered:</b> %{y}<extra></extra>'
                         ))
 
-                        # Linea per piloti guest
+                        # Linea per piloti guest - ROSSO LONGDASH
                         fig.add_trace(go.Scatter(
                             x=dates,
                             y=guests,
                             mode='lines+markers',
                             name='Guest Drivers',
-                            line=dict(color='#ffc107', width=3, dash='dash'),
-                            marker=dict(size=8, color='#ffc107', symbol='diamond'),
+                            line=dict(color='#dc3545', width=3, dash='longdash'),
+                            marker=dict(size=8, color='#dc3545', symbol='diamond'),
                             hovertemplate='<b>Guests:</b> %{y}<extra></extra>'
                         ))
 
@@ -1995,12 +1995,13 @@ class ACCWebDashboard:
             date_from_str = date_from.strftime('%Y-%m-%d')
             date_to_str = (date_to + timedelta(days=1)).strftime('%Y-%m-%d')
 
-            # Query per contare partecipanti unici per giorno (separati per registrati e guest)
+            # Query per contare partecipanti unici per giorno (separati per registrati e guest) + numero sessioni
             cursor.execute("""
                 SELECT
                     DATE(s.session_date) as session_day,
                     COUNT(DISTINCT CASE WHEN d.trust_level > 0 THEN sr.driver_id END) as registered_participants,
-                    COUNT(DISTINCT CASE WHEN d.trust_level = 0 THEN sr.driver_id END) as guest_participants
+                    COUNT(DISTINCT CASE WHEN d.trust_level = 0 THEN sr.driver_id END) as guest_participants,
+                    COUNT(DISTINCT s.session_id) as total_sessions
                 FROM sessions s
                 JOIN session_results sr ON s.session_id = sr.session_id
                 JOIN drivers d ON sr.driver_id = d.driver_id
@@ -2017,8 +2018,9 @@ class ACCWebDashboard:
                 dates = []
                 registered = []
                 guests = []
+                sessions = []
 
-                for session_day, reg_count, guest_count in participation_data:
+                for session_day, reg_count, guest_count, session_count in participation_data:
                     # Formatta data per visualizzazione
                     try:
                         date_obj = datetime.strptime(session_day, "%Y-%m-%d")
@@ -2026,45 +2028,60 @@ class ACCWebDashboard:
                         dates.append(formatted_date)
                         registered.append(reg_count if reg_count else 0)
                         guests.append(guest_count if guest_count else 0)
+                        sessions.append(session_count if session_count else 0)
                     except:
                         # Se la conversione fallisce, usa la stringa originale
                         dates.append(session_day)
                         registered.append(reg_count if reg_count else 0)
                         guests.append(guest_count if guest_count else 0)
+                        sessions.append(session_count if session_count else 0)
 
                 # Crea il grafico con Plotly
                 fig = go.Figure()
 
-                # Linea per piloti registrati
+                # Linea per piloti registrati (asse Y sinistro) - BLU DOT (punteggiata)
                 fig.add_trace(go.Scatter(
                     x=dates,
                     y=registered,
                     mode='lines+markers',
                     name='Registered Drivers',
-                    line=dict(color='#28a745', width=3),
-                    marker=dict(size=8, color='#28a745'),
-                    hovertemplate='<b>Registered:</b> %{y}<extra></extra>'
+                    line=dict(color='#007bff', width=3, dash='dot'),
+                    marker=dict(size=8, color='#007bff'),
+                    hovertemplate='<b>Registered:</b> %{y}<extra></extra>',
+                    yaxis='y'
                 ))
 
-                # Linea per piloti guest
+                # Linea per piloti guest (asse Y sinistro) - ROSSO SOLIDA
                 fig.add_trace(go.Scatter(
                     x=dates,
                     y=guests,
                     mode='lines+markers',
                     name='Guest Drivers',
-                    line=dict(color='#ffc107', width=3, dash='dash'),
-                    marker=dict(size=8, color='#ffc107', symbol='diamond'),
-                    hovertemplate='<b>Guests:</b> %{y}<extra></extra>'
+                    line=dict(color='#dc3545', width=3),
+                    marker=dict(size=8, color='#dc3545', symbol='diamond'),
+                    hovertemplate='<b>Guests:</b> %{y}<extra></extra>',
+                    yaxis='y'
+                ))
+
+                # Linea per numero sessioni (asse Y destro) - VERDE SOLIDA
+                fig.add_trace(go.Scatter(
+                    x=dates,
+                    y=sessions,
+                    mode='lines+markers',
+                    name='Sessions',
+                    line=dict(color='#28a745', width=2),
+                    marker=dict(size=6, color='#28a745', symbol='square'),
+                    hovertemplate='<b>Sessions:</b> %{y}<extra></extra>',
+                    yaxis='y2'
                 ))
 
                 fig.update_layout(
                     title={
-                        'text': 'Daily Unique Participants (Registered vs Guests)',
+                        'text': 'Daily Participation & Sessions Trend',
                         'x': 0.5,
                         'xanchor': 'center'
                     },
                     xaxis_title="Date",
-                    yaxis_title="Number of Unique Participants",
                     hovermode='x unified',
                     template='plotly_dark',
                     height=500,
@@ -2082,26 +2099,41 @@ class ACCWebDashboard:
                         nticks=20
                     ),
                     yaxis=dict(
-                        rangemode='tozero'
+                        title="Number of Unique Participants",
+                        rangemode='tozero',
+                        side='left'
+                    ),
+                    yaxis2=dict(
+                        title="Number of Sessions",
+                        rangemode='tozero',
+                        side='right',
+                        overlaying='y',
+                        showgrid=False
                     )
                 )
 
                 st.plotly_chart(fig, use_container_width=True)
 
                 # Statistiche aggiuntive
-                col1, col2, col3, col4 = st.columns(4)
+                col1, col2, col3, col4, col5, col6 = st.columns(6)
                 with col1:
                     avg_registered = sum(registered) / len(registered) if registered else 0
                     st.metric("Avg Registered", f"{avg_registered:.1f}")
                 with col2:
-                    avg_guests = sum(guests) / len(guests) if guests else 0
-                    st.metric("Avg Guests", f"{avg_guests:.1f}")
-                with col3:
                     max_registered = max(registered) if registered else 0
                     st.metric("Peak Registered", f"{max_registered}")
+                with col3:
+                    avg_guests = sum(guests) / len(guests) if guests else 0
+                    st.metric("Avg Guests", f"{avg_guests:.1f}")
                 with col4:
                     max_guests = max(guests) if guests else 0
                     st.metric("Peak Guests", f"{max_guests}")
+                with col5:
+                    avg_sessions = sum(sessions) / len(sessions) if sessions else 0
+                    st.metric("Avg Sessions/Day", f"{avg_sessions:.1f}")
+                with col6:
+                    total_sessions = sum(sessions) if sessions else 0
+                    st.metric("Total Sessions", f"{total_sessions}")
 
             else:
                 st.info("ℹ️ No participation data available for the selected period")
