@@ -484,31 +484,17 @@ class ACCWebDashboard:
 </a>
 </div>""", unsafe_allow_html=True)
 
-        # Box unico con le statistiche principali
-        st.markdown(f"""<div style="background: linear-gradient(135deg, #1e1e1e, #2d2d2d); padding: 25px; border-radius: 15px; margin: 20px 0; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);">
-<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;">
-<div style="text-align: center; padding: 10px;">
-<p style="font-size: 1.8rem; font-weight: bold; margin: 0; color: #dc3545;">{stats['total_drivers']}</p>
-<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">👥 Registered Drivers</p>
-</div>
-<div style="text-align: center; padding: 10px;">
-<p style="font-size: 1.8rem; font-weight: bold; margin: 0; color: #4a90e2;">{stats['guest_drivers']}</p>
-<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">👻 Guest Drivers</p>
-</div>
-<div style="text-align: center; padding: 10px;">
-<p style="font-size: 1.8rem; font-weight: bold; margin: 0; color: #28a745;">{stats['total_leagues']}</p>
-<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🌟 Leagues</p>
-</div>
-<div style="text-align: center; padding: 10px;">
-<p style="font-size: 1.8rem; font-weight: bold; margin: 0; color: #28a745;">{stats['total_championships']}</p>
-<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🏆 Championships</p>
-</div>
-<div style="text-align: center; padding: 10px;">
-<p style="font-size: 1.8rem; font-weight: bold; margin: 0; color: #28a745;">{stats['fun_competitions']}</p>
-<p style="font-size: 0.9rem; color: #aaa; margin: 5px 0 0 0;">🎉 4Fun</p>
-</div>
-</div>
-</div>""", unsafe_allow_html=True)
+        # Statistiche principali
+        st.markdown("---")
+        st.subheader("📊 Database Statistics")
+
+        st.markdown(f"""
+        - 👥 **Registered Drivers:** {stats['total_drivers']}
+        - 👻 **Guest Drivers:** {stats['guest_drivers']}
+        - 🌟 **Leagues:** {stats['total_leagues']}
+        - 🏆 **Championships:** {stats['total_championships']}
+        - 🎉 **4Fun Competitions:** {stats['fun_competitions']}
+        """)
 
     # [Tutte le altre funzioni rimangono identiche]
     def get_championships_list(self) -> List[Tuple]:
@@ -530,8 +516,8 @@ class ACCWebDashboard:
                 WHERE championship_type = 'standard'
                 ORDER BY
                     is_completed ASC,
-                    CASE WHEN end_date IS NULL THEN 1 ELSE 0 END,
-                    end_date DESC,
+                    CASE WHEN start_date IS NULL THEN 1 ELSE 0 END,
+                    start_date DESC,
                     championship_id DESC
             """)
 
@@ -1986,13 +1972,143 @@ class ACCWebDashboard:
             st.markdown("---")
             st.subheader("📋 Sessions List Summary")
             self.show_sessions_summary_table(sessions_list, sessions_stats)
-            
+
+            # Grafico partecipazione giornaliera (solo in General Summary)
+            st.markdown("---")
+            self.show_daily_participation_chart(date_from, date_to)
+
         elif selected_session_option in session_map:
             # Mostra dettagli della sessione specifica
             selected_session_id = session_map[selected_session_option]
             st.markdown("---")
             self.show_session_details(selected_session_id)
-    
+
+    def show_daily_participation_chart(self, date_from: date, date_to: date):
+        """Mostra grafico andamento partecipazione giornaliera nel periodo selezionato"""
+        st.subheader("📈 Daily Participation Trend")
+
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            # Converti date per query SQL
+            date_from_str = date_from.strftime('%Y-%m-%d')
+            date_to_str = (date_to + timedelta(days=1)).strftime('%Y-%m-%d')
+
+            # Query per contare partecipanti unici per giorno (separati per registrati e guest)
+            cursor.execute("""
+                SELECT
+                    DATE(s.session_date) as session_day,
+                    COUNT(DISTINCT CASE WHEN d.trust_level > 0 THEN sr.driver_id END) as registered_participants,
+                    COUNT(DISTINCT CASE WHEN d.trust_level = 0 THEN sr.driver_id END) as guest_participants
+                FROM sessions s
+                JOIN session_results sr ON s.session_id = sr.session_id
+                JOIN drivers d ON sr.driver_id = d.driver_id
+                WHERE DATE(s.session_date) >= ? AND DATE(s.session_date) < ?
+                GROUP BY DATE(s.session_date)
+                ORDER BY session_day ASC
+            """, (date_from_str, date_to_str))
+
+            participation_data = cursor.fetchall()
+            conn.close()
+
+            if participation_data:
+                # Converti i dati per il grafico
+                dates = []
+                registered = []
+                guests = []
+
+                for session_day, reg_count, guest_count in participation_data:
+                    # Formatta data per visualizzazione
+                    try:
+                        date_obj = datetime.strptime(session_day, "%Y-%m-%d")
+                        formatted_date = date_obj.strftime("%d/%m/%Y")
+                        dates.append(formatted_date)
+                        registered.append(reg_count if reg_count else 0)
+                        guests.append(guest_count if guest_count else 0)
+                    except:
+                        # Se la conversione fallisce, usa la stringa originale
+                        dates.append(session_day)
+                        registered.append(reg_count if reg_count else 0)
+                        guests.append(guest_count if guest_count else 0)
+
+                # Crea il grafico con Plotly
+                fig = go.Figure()
+
+                # Linea per piloti registrati
+                fig.add_trace(go.Scatter(
+                    x=dates,
+                    y=registered,
+                    mode='lines+markers',
+                    name='Registered Drivers',
+                    line=dict(color='#28a745', width=3),
+                    marker=dict(size=8, color='#28a745'),
+                    hovertemplate='<b>Registered:</b> %{y}<extra></extra>'
+                ))
+
+                # Linea per piloti guest
+                fig.add_trace(go.Scatter(
+                    x=dates,
+                    y=guests,
+                    mode='lines+markers',
+                    name='Guest Drivers',
+                    line=dict(color='#ffc107', width=3, dash='dash'),
+                    marker=dict(size=8, color='#ffc107', symbol='diamond'),
+                    hovertemplate='<b>Guests:</b> %{y}<extra></extra>'
+                ))
+
+                fig.update_layout(
+                    title={
+                        'text': 'Daily Unique Participants (Registered vs Guests)',
+                        'x': 0.5,
+                        'xanchor': 'center'
+                    },
+                    xaxis_title="Date",
+                    yaxis_title="Number of Unique Participants",
+                    hovermode='x unified',
+                    template='plotly_dark',
+                    height=500,
+                    showlegend=True,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    ),
+                    xaxis=dict(
+                        tickangle=-45,
+                        tickmode='auto',
+                        nticks=20
+                    ),
+                    yaxis=dict(
+                        rangemode='tozero'
+                    )
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Statistiche aggiuntive
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    avg_registered = sum(registered) / len(registered) if registered else 0
+                    st.metric("Avg Registered", f"{avg_registered:.1f}")
+                with col2:
+                    avg_guests = sum(guests) / len(guests) if guests else 0
+                    st.metric("Avg Guests", f"{avg_guests:.1f}")
+                with col3:
+                    max_registered = max(registered) if registered else 0
+                    st.metric("Peak Registered", f"{max_registered}")
+                with col4:
+                    max_guests = max(guests) if guests else 0
+                    st.metric("Peak Guests", f"{max_guests}")
+
+            else:
+                st.info("ℹ️ No participation data available for the selected period")
+
+        except Exception as e:
+            st.error(f"❌ Error loading participation trend: {e}")
+
     def show_sessions_summary_table(self, sessions_list: pd.DataFrame, sessions_stats: Dict = None):
         """Mostra tabella riassuntiva di tutte le sessioni (General Summary)"""
         if sessions_list.empty:
@@ -3822,8 +3938,8 @@ def main():
                 "🌟 Leagues",
                 "🏆 Championships",
                 "🎉 Official 4Fun",
-                "📅 Sessions",
-                "⚡ Best Lap",
+                "📅 All Sessions",
+                "⚡ Best Laps",
                 "👥 Drivers",
                 "📈 Statistics"
             ]
@@ -3842,10 +3958,10 @@ def main():
         elif page == "🎉 Official 4Fun":
             dashboard.show_4fun_report()
 
-        elif page == "📅 Sessions":
+        elif page == "📅 All Sessions":
             dashboard.show_sessions_report()
 
-        elif page == "⚡ Best Lap":
+        elif page == "⚡ Best Laps":
             dashboard.show_best_laps_report()
 
         elif page == "👥 Drivers":
