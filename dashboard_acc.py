@@ -1066,6 +1066,7 @@ class ACCWebDashboard:
                         ls.tier3_points,
                         ls.tier4_points,
                         ls.total_final_points,
+                        ls.consistency_cv,
                         ls.consistency_bonus,
                         ls.tiers_participated,
                         ls.total_wins,
@@ -1087,7 +1088,7 @@ class ACCWebDashboard:
 
                     # Rinomina colonne (nell'ordine originale della query)
                     df_display.columns = ['Pos', 'Driver', 'Tier 1 Pts', 'Tier 2 Pts', 'Tier 3 Pts', 'Tier 4 Pts',
-                                         'Total Pts', 'Consist Pts', 'n Tiers', 'n Wins', 'n Pods', 'n Pole', 'n FLap']
+                                         'Total Pts', 'CV%', 'Consist Pts', 'n Tiers', 'n Wins', 'n Pods', 'n Pole', 'n FLap']
 
                     # Formatta valori numerici con 1 decimale per i punti
                     df_display['Tier 1 Pts'] = df_display['Tier 1 Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
@@ -1095,11 +1096,13 @@ class ACCWebDashboard:
                     df_display['Tier 3 Pts'] = df_display['Tier 3 Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
                     df_display['Tier 4 Pts'] = df_display['Tier 4 Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
                     df_display['Total Pts'] = df_display['Total Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
+                    # CV% in percentuale (moltiplicato per 100)
+                    df_display['CV%'] = df_display['CV%'].apply(lambda x: f"{x*100:.1f}%" if pd.notna(x) and x > 0 else "-")
                     df_display['Consist Pts'] = df_display['Consist Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
 
-                    # Riordina colonne: Pos, Driver, n Tiers, n Wins, n Pods, n Pole, n FLap, Tier 1-4, Consist, Total
+                    # Riordina colonne: Pos, Driver, n Tiers, n Wins, n Pods, n Pole, n FLap, Tier 1-4, CV%, Consist, Total
                     column_order = ['Pos', 'Driver', 'n Tiers', 'n Wins', 'n Pods', 'n Pole', 'n FLap',
-                                   'Tier 1 Pts', 'Tier 2 Pts', 'Tier 3 Pts', 'Tier 4 Pts', 'Consist Pts', 'Total Pts']
+                                   'Tier 1 Pts', 'Tier 2 Pts', 'Tier 3 Pts', 'Tier 4 Pts', 'CV%', 'Consist Pts', 'Total Pts']
                     df_display = df_display[column_order]
 
                     # Applica stile: Total Pts in grassetto e verde
