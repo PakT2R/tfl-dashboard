@@ -567,65 +567,35 @@ class ACCWebDashboard:
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            
+
             cursor.execute("""
                 SELECT
-                    competition_id,
-                    name,
-                    track_name,
-                    round_number,
-                    date_start,
-                    date_end,
-                    weekend_format,
-                    is_completed
-                FROM competitions
-                WHERE championship_id = ?
+                    c.competition_id,
+                    c.name,
+                    c.track_name,
+                    c.round_number,
+                    c.date_start,
+                    c.date_end,
+                    c.weekend_format,
+                    c.is_completed,
+                    COUNT(s.session_id) as session_count
+                FROM competitions c
+                LEFT JOIN sessions s ON c.competition_id = s.competition_id
+                WHERE c.championship_id = ?
+                GROUP BY c.competition_id
                 ORDER BY
-                    CASE WHEN date_start IS NULL THEN 1 ELSE 0 END,
-                    date_start DESC,
-                    round_number DESC
+                    CASE WHEN c.date_start IS NULL THEN 1 ELSE 0 END,
+                    c.date_start DESC,
+                    c.round_number DESC
             """, (championship_id,))
-            
+
             competitions = cursor.fetchall()
             conn.close()
-            
+
             return competitions
-            
+
         except Exception as e:
             st.error(f"❌ Errore nel recupero competizioni: {e}")
-            return []
-    
-    def get_championship_competitions_calendar(self, championship_id: int) -> List[Tuple]:
-        """Ottiene lista competizioni del campionato ordinata cronologicamente per il calendario"""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                SELECT 
-                    competition_id,
-                    name,
-                    track_name,
-                    round_number,
-                    date_start,
-                    date_end,
-                    weekend_format,
-                    is_completed
-                FROM competitions
-                WHERE championship_id = ?
-                ORDER BY 
-                    CASE WHEN date_start IS NULL THEN 1 ELSE 0 END,
-                    date_start ASC,
-                    round_number ASC
-            """, (championship_id,))
-            
-            competitions = cursor.fetchall()
-            conn.close()
-            
-            return competitions
-            
-        except Exception as e:
-            st.error(f"❌ Error loading calendar: {e}")
             return []
     
     def get_competition_results(self, competition_id: int) -> pd.DataFrame:
@@ -967,33 +937,36 @@ class ACCWebDashboard:
         """Mostra il report leagues"""
         st.header("🌟 Leagues")
 
-        # Ottieni lista leagues
+        # Ottieni lista leagues con conteggio standing
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
             cursor.execute("""
                 SELECT
-                    league_id,
-                    name,
-                    season,
-                    start_date,
-                    end_date,
-                    total_tiers,
-                    is_completed,
-                    description
-                FROM leagues
+                    l.league_id,
+                    l.name,
+                    l.season,
+                    l.start_date,
+                    l.end_date,
+                    l.total_tiers,
+                    l.is_completed,
+                    l.description,
+                    COUNT(ls.driver_id) as standings_count
+                FROM leagues l
+                LEFT JOIN league_standings ls ON l.league_id = ls.league_id
+                GROUP BY l.league_id
                 ORDER BY
-                    CASE WHEN start_date IS NULL THEN 1 ELSE 0 END,
-                    start_date DESC,
-                    league_id DESC
+                    CASE WHEN l.start_date IS NULL THEN 1 ELSE 0 END,
+                    l.start_date DESC,
+                    l.league_id DESC
             """)
 
             leagues = cursor.fetchall()
-            conn.close()
 
             if not leagues:
                 st.warning("❌ No leagues found in database")
+                conn.close()
                 return
 
             # Prepara opzioni per selectbox
@@ -1001,7 +974,7 @@ class ACCWebDashboard:
             league_map = {}
             default_league_index = 0  # Default: prima league
 
-            for league_id, name, season, start_date, end_date, total_tiers, is_completed, description in leagues:
+            for league_id, name, season, start_date, end_date, total_tiers, is_completed, description, standings_count in leagues:
                 # Formato display
                 status_str = " ✅" if is_completed else " 🔄"
                 season_str = f" - {season}" if season else ""
@@ -1009,21 +982,19 @@ class ACCWebDashboard:
                 league_options.append(display_name)
                 league_map[display_name] = league_id
 
-            # Trova default index: più recente completata, o prima non completata
-            first_completed_idx = None
-            first_not_completed_idx = None
+            # Trova default index: più recente con classifica calcolata
+            first_with_standings_idx = None
 
-            for idx, (league_id, name, season, start_date, end_date, total_tiers, is_completed, description) in enumerate(leagues):
-                if is_completed and first_completed_idx is None:
-                    first_completed_idx = idx
-                if not is_completed and first_not_completed_idx is None:
-                    first_not_completed_idx = idx
+            for idx, (league_id, name, season, start_date, end_date, total_tiers, is_completed, description, standings_count) in enumerate(leagues):
+                if standings_count > 0 and first_with_standings_idx is None:
+                    first_with_standings_idx = idx
+                    break
 
-            # Seleziona la più recente completata, altrimenti la prima non completata
-            if first_completed_idx is not None:
-                default_league_index = first_completed_idx
-            elif first_not_completed_idx is not None:
-                default_league_index = first_not_completed_idx
+            # Seleziona la più recente con standing, altrimenti la prima in lista
+            if first_with_standings_idx is not None:
+                default_league_index = first_with_standings_idx
+            else:
+                default_league_index = 0  # Fallback alla prima league
 
             # Selectbox league
             selected_league_display = st.selectbox(
@@ -1150,22 +1121,25 @@ class ACCWebDashboard:
                 st.markdown("---")
                 st.subheader("🏆 League Tiers")
 
-                # Ottieni championships (tier) della lega
+                # Ottieni championships (tier) della lega con conteggio standing
                 cursor.execute("""
                     SELECT
-                        championship_id,
-                        name,
-                        tier_number,
-                        start_date,
-                        end_date,
-                        is_completed,
-                        description
-                    FROM championships
-                    WHERE league_id = ? AND championship_type = 'tier'
+                        c.championship_id,
+                        c.name,
+                        c.tier_number,
+                        c.start_date,
+                        c.end_date,
+                        c.is_completed,
+                        c.description,
+                        COUNT(cs.driver_id) as standings_count
+                    FROM championships c
+                    LEFT JOIN championship_standings cs ON c.championship_id = cs.championship_id
+                    WHERE c.league_id = ? AND c.championship_type = 'tier'
+                    GROUP BY c.championship_id
                     ORDER BY
-                        CASE WHEN start_date IS NULL THEN 1 ELSE 0 END,
-                        start_date DESC,
-                        championship_id DESC
+                        CASE WHEN c.start_date IS NULL THEN 1 ELSE 0 END,
+                        c.start_date DESC,
+                        c.championship_id DESC
                 """, (selected_league_id,))
 
                 tier_championships = cursor.fetchall()
@@ -1176,7 +1150,7 @@ class ACCWebDashboard:
                     tier_map = {}
                     default_tier_index = 1  # Default al primo tier (dopo "Select a tier...")
 
-                    for idx, (champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc) in enumerate(tier_championships):
+                    for idx, (champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc, standings_count) in enumerate(tier_championships):
                         # Formato display
                         status_str = " ✅" if is_completed else " 🔄"
                         date_str = f" ({date_start[:10]})" if date_start else ""
@@ -1185,21 +1159,19 @@ class ACCWebDashboard:
                         tier_options.append(display_name)
                         tier_map[display_name] = champ_id
 
-                    # Trova default index: più recente completata, o prima non completata
-                    first_completed_idx = None
-                    first_not_completed_idx = None
+                    # Trova default index: più recente con classifica calcolata
+                    first_with_standings_idx = None
 
-                    for idx, (champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc) in enumerate(tier_championships):
-                        if is_completed and first_completed_idx is None:
-                            first_completed_idx = idx + 1  # +1 per "Select a tier..."
-                        if not is_completed and first_not_completed_idx is None:
-                            first_not_completed_idx = idx + 1
+                    for idx, (champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc, standings_count) in enumerate(tier_championships):
+                        if standings_count > 0 and first_with_standings_idx is None:
+                            first_with_standings_idx = idx + 1  # +1 per "Select a tier..."
+                            break
 
-                    # Seleziona la più recente completata, altrimenti la prima non completata
-                    if first_completed_idx is not None:
-                        default_tier_index = first_completed_idx
-                    elif first_not_completed_idx is not None:
-                        default_tier_index = first_not_completed_idx
+                    # Seleziona il più recente con standing, altrimenti il primo in lista
+                    if first_with_standings_idx is not None:
+                        default_tier_index = first_with_standings_idx
+                    else:
+                        default_tier_index = 1  # Fallback al primo tier
 
                     # Selectbox tier
                     selected_tier = st.selectbox(
@@ -1219,7 +1191,7 @@ class ACCWebDashboard:
                         )
 
                         if selected_tier_info:
-                            champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc = selected_tier_info
+                            champ_id, champ_name, tier_num, date_start, date_end, is_completed, desc, standings_count = selected_tier_info
 
                             # Header tier championship
                             tier_header = f"""
@@ -1676,7 +1648,7 @@ class ACCWebDashboard:
         competition_map = {}
         default_index = 1  # Default: prima competizione
 
-        for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed) in enumerate(competitions):
+        for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count) in enumerate(competitions):
             # Formato display
             round_str = f"R{round_num} - " if round_num else ""
             status_str = " ✅" if is_completed else " 🔄"
@@ -1687,21 +1659,19 @@ class ACCWebDashboard:
             competition_options.append(display_name)
             competition_map[display_name] = comp_id
 
-        # Trova default index: più recente completata, o prima non completata
-        first_completed_idx = None
-        first_not_completed_idx = None
+        # Trova default index: più recente con almeno una sessione caricata
+        first_with_sessions_idx = None
 
-        for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed) in enumerate(competitions):
-            if is_completed and first_completed_idx is None:
-                first_completed_idx = idx + 1  # +1 per "Select a competition..."
-            if not is_completed and first_not_completed_idx is None:
-                first_not_completed_idx = idx + 1
+        for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count) in enumerate(competitions):
+            if session_count > 0 and first_with_sessions_idx is None:
+                first_with_sessions_idx = idx + 1  # +1 per "Select a competition..."
+                break
 
-        # Seleziona la più recente completata, altrimenti la prima non completata
-        if first_completed_idx is not None:
-            default_index = first_completed_idx
-        elif first_not_completed_idx is not None:
-            default_index = first_not_completed_idx
+        # Seleziona la più recente con sessioni, altrimenti la prima in lista
+        if first_with_sessions_idx is not None:
+            default_index = first_with_sessions_idx
+        else:
+            default_index = 1  # Fallback alla prima competizione
 
         # Selectbox competizione
         selected_competition = st.selectbox(
@@ -1725,7 +1695,7 @@ class ACCWebDashboard:
     
     def show_competition_details(self, competition_info: Tuple, competition_id: int):
         """Mostra dettagli competizione"""
-        comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed = competition_info
+        comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count = competition_info
         
         # Header competizione
         round_str = f"Round {round_num} - " if round_num else ""
@@ -2326,89 +2296,6 @@ class ACCWebDashboard:
         except Exception as e:
             st.error(f"❌ Error retrieving sessions statistics: {e}")
             return {}
-    
-    def show_sessions_main_stats(self, stats: Dict):
-        """Mostra statistiche principali delle sessioni"""
-        # Prima riga di metriche
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{stats['total_sessions']}</p>
-                <p class="metric-label">🎮 Total Sessions</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{stats['unique_drivers']}</p>
-                <p class="metric-label">👥 Unique Drivers</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{stats['official_sessions']}</p>
-                <p class="metric-label">🏆 Official Sessions</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{stats['non_official_sessions']}</p>
-                <p class="metric-label">❌ Unofficial Sessions</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Seconda riga di metriche
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.5rem;">{stats['most_used_track']}</p>
-                <p class="metric-label">🏁 Most Used Track</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value">{stats['most_used_count']}</p>
-                <p class="metric-label">📊 Sessions on Track</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            # Ultima sessione - circuito
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.5rem;">{stats['last_session_track']}</p>
-                <p class="metric-label">📍 Last Session Track</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col4:
-            # Ultima sessione - data e ora
-            if stats['last_session_date']:
-                try:
-                    last_date = datetime.fromisoformat(stats['last_session_date'].replace('Z', '+00:00'))
-                    date_str = last_date.strftime('%d/%m %H:%M')
-                except:
-                    date_str = stats['last_session_date'][:16] if stats['last_session_date'] else "N/A"
-            else:
-                date_str = "N/A"
-            
-            st.markdown(f"""
-            <div class="metric-card">
-                <p class="metric-value" style="font-size: 1.3rem;">{date_str}</p>
-                <p class="metric-label">📅 Last Session Date</p>
-            </div>
-            """, unsafe_allow_html=True)
     
     def get_sessions_list_with_details(self, date_from: date, date_to: date) -> pd.DataFrame:
         """Ottiene lista sessioni con dettagli per il periodo specificato"""
@@ -3226,88 +3113,6 @@ class ACCWebDashboard:
         '''
 
         return self.safe_sql_query(query, [track_name, track_name])
-    
-    def show_track_charts(self, track_name: str, leaderboard_df: pd.DataFrame):
-        """Mostra grafici per la pista"""
-        if leaderboard_df.empty:
-            st.info("No data available for charts")
-            return
-        
-        # Grafico distribuzione performance piloti
-        if len(leaderboard_df) > 1:
-            st.subheader("📊 Driver Performance Distribution")
-            
-            # Ottieni migliori giri di ogni pilota
-            performance_data = self.get_track_evolution_data(track_name)
-            
-            if not performance_data.empty:
-                fig_performance = px.bar(
-                    performance_data,
-                    x='driver_name',
-                    y='tempo_secondi',
-                    title=f"Migliori Giri per Pilota - {track_name}",
-                    hover_data=['session_date', 'session_type'],
-                    color='tempo_secondi',
-                    color_continuous_scale='viridis'
-                )
-                fig_performance.update_layout(height=400, showlegend=False)
-                
-                # Imposta scala Y più precisa partendo dal minimo - 1 secondo
-                min_time = performance_data['tempo_secondi'].min()
-                max_time = performance_data['tempo_secondi'].max()
-                y_range = [min_time - 1, max_time + 0.5]
-                
-                fig_performance.update_yaxes(
-                    title="Tempo Best Lap (secondi)",
-                    range=y_range
-                )
-                fig_performance.update_xaxes(title="Piloti (ordinati per performance)", tickangle=45)
-                st.plotly_chart(fig_performance, use_container_width=True)
-            else:
-                st.info("Insufficient data for performance chart")
-    
-    def get_track_evolution_data(self, track_name: str) -> pd.DataFrame:
-        """Ottiene migliori giri per ogni pilota ordinati per performance (solo competizioni ufficiali e piloti TFL)"""
-
-        query = '''
-            WITH driver_best_laps AS (
-                SELECT
-                    l.driver_id,
-                    MIN(l.lap_time) as best_lap
-                FROM laps l
-                JOIN sessions s ON l.session_id = s.session_id
-                JOIN drivers d ON l.driver_id = d.driver_id
-                WHERE s.track_name = ?
-                  AND l.is_valid_for_best = 1
-                  AND l.lap_time > 0
-                  AND s.competition_id IS NOT NULL
-                  AND d.trust_level > 0
-                GROUP BY l.driver_id
-            )
-            SELECT
-                d.last_name as driver_name,
-                dbl.best_lap,
-                s.session_date,
-                s.session_type
-            FROM driver_best_laps dbl
-            JOIN laps l ON l.driver_id = dbl.driver_id AND l.lap_time = dbl.best_lap
-            JOIN sessions s ON l.session_id = s.session_id
-            JOIN drivers d ON dbl.driver_id = d.driver_id
-            WHERE s.track_name = ?
-              AND l.is_valid_for_best = 1
-              AND s.competition_id IS NOT NULL
-              AND d.trust_level > 0
-            ORDER BY dbl.best_lap ASC
-            LIMIT 20
-        '''
-
-        df = self.safe_sql_query(query, [track_name, track_name])
-        
-        if not df.empty:
-            # Converti tempi in secondi
-            df['tempo_secondi'] = df['best_lap'] / 1000
-        
-        return df
     
     def format_time_duration(self, milliseconds: int) -> str:
         """Formatta durata in millisecondi per gap"""
