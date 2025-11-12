@@ -19,7 +19,7 @@ from typing import Optional, Dict, List, Tuple
 
 # Configurazione pagina
 st.set_page_config(
-    page_title="TFL Standings Dashboard",
+    page_title="TFL3 Standings Dashboard",
     page_icon="🏁",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -3846,3 +3846,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
