@@ -3963,22 +3963,15 @@ def main():
             st.sidebar.markdown("**🔧 Development Mode**")
             st.sidebar.markdown(f"DB: `{os.path.basename(dashboard.db_path)}`")
 
-        # Inizializza session state per l'ultima pagina valida
-        if 'last_valid_page' not in st.session_state:
-            st.session_state.last_valid_page = "🏠 Homepage"
-
         # Menu principale
         page = st.sidebar.selectbox(
             "Select page:",
             [
                 "🏠 Homepage",
-                "── LEAGUE ──",
-                "🏆 Standings",
+                "🌟 Leagues",
                 "⏱️ Time Attack",
-                "── LEGACY ──",
                 "🏆 Championships",
                 "🎉 Official 4Fun",
-                "── OTHERS ──",
                 "📅 All Sessions",
                 "⚡ Best Laps",
                 "👥 Drivers",
@@ -3986,17 +3979,11 @@ def main():
             ]
         )
 
-        # Se è un separatore, usa l'ultima pagina valida
-        if page.startswith("──"):
-            page = st.session_state.last_valid_page
-        else:
-            st.session_state.last_valid_page = page
-
         # Routing pagine
         if page == "🏠 Homepage":
             dashboard.show_homepage()
 
-        elif page == "🏆 Standings":
+        elif page == "🌟 Leagues":
             dashboard.show_leagues_report()
 
         elif page == "⏱️ Time Attack":
