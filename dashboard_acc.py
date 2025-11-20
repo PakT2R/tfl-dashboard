@@ -581,6 +581,7 @@ class ACCWebDashboard:
                     COUNT(s.session_id) as session_count
                 FROM competitions c
                 LEFT JOIN sessions s ON c.competition_id = s.competition_id
+                    AND (s.is_time_attack IS NULL OR s.is_time_attack = 0)
                 WHERE c.championship_id = ?
                 GROUP BY c.competition_id
                 ORDER BY
@@ -643,6 +644,7 @@ class ACCWebDashboard:
                     AND sr.is_spectator = FALSE
                 LEFT JOIN drivers d ON sr.driver_id = d.driver_id
                 WHERE s.competition_id = ?
+                    AND (s.is_time_attack IS NULL OR s.is_time_attack = 0)
                 ORDER BY s.session_order, s.session_date
             """, (competition_id,))
 
