@@ -452,7 +452,7 @@ class ACCWebDashboard:
 
         # TFL Introduction Text
         st.markdown("""<div style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 50%, #495057 100%); padding: 40px 30px; border-radius: 20px; margin: 20px 0; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3); text-align: center; color: white; border: 3px solid rgba(255, 255, 255, 0.15);">
-<p style="font-size: 2.5rem; font-weight: 900; margin: 0 0 25px 0; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4); letter-spacing: 1px; line-height: 1.2;">🏁 Race when you want, compete always 🏁</p>
+<p style="font-size: 2.5rem; font-weight: 900; margin: 0 0 25px 0; text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4); letter-spacing: 1px; line-height: 1.2;">🏁 One night a week, one season together 🏁</p>
 <div style="background: rgba(255, 255, 255, 0.25); padding: 2px; margin: 25px auto; width: 80%; border-radius: 5px;"></div>
 <p style="font-size: 1.2rem; margin: 20px 0; font-weight: 500; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Welcome to the official dashboard of the <strong>Tier Friends League</strong></p>
 <p style="font-size: 1.1rem; margin: 25px 0 15px 0; font-weight: 600; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Use the menu to view:</p>
@@ -469,7 +469,7 @@ class ACCWebDashboard:
 
         # Link to rulebook
         st.markdown("""<div style="text-align: center; margin: 25px 0;">
-<a href="https://raw.githubusercontent.com/PakT2R/tfl-dashboard/main/TIER_FRIENDS_LEAGUE_Regolamento.pdf" target="_blank" style="text-decoration: none;">
+<a href="https://raw.githubusercontent.com/PakT2R/tfl-dashboard/main/tfl3_regolamento.html" target="_blank" style="text-decoration: none;">
 <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             display: inline-block; padding: 18px 50px; border-radius: 50px;
             box-shadow: 0 6px 25px rgba(40, 167, 69, 0.4);
@@ -932,7 +932,179 @@ class ACCWebDashboard:
                 st.markdown("<br>", unsafe_allow_html=True)
         else:
             st.warning("❌ No sessions found for this 4Fun competition")
-    
+
+    def show_time_attack_report(self):
+        """Mostra il report Time Attack con selezione competizione"""
+        st.header("⏱️ Time Attack")
+
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            # Ottieni solo competizioni con sessioni Time Attack o risultati Time Attack
+            cursor.execute("""
+                SELECT DISTINCT
+                    c.competition_id,
+                    c.name,
+                    c.track_name,
+                    c.round_number,
+                    c.date_start,
+                    c.date_end,
+                    c.weekend_format,
+                    c.is_completed,
+                    (SELECT COUNT(*) FROM sessions WHERE competition_id = c.competition_id AND is_time_attack = 1) as session_count
+                FROM competitions c
+                WHERE EXISTS (
+                    SELECT 1 FROM sessions s
+                    WHERE s.competition_id = c.competition_id AND s.is_time_attack = 1
+                )
+                OR EXISTS (
+                    SELECT 1 FROM time_attack_results tar
+                    WHERE tar.competition_id = c.competition_id
+                )
+                ORDER BY
+                    CASE WHEN c.is_completed = 1 THEN 0 ELSE 1 END,
+                    CASE WHEN c.date_start IS NULL THEN 1 ELSE 0 END,
+                    c.date_start DESC,
+                    c.round_number DESC
+            """)
+
+            competitions = cursor.fetchall()
+
+            if not competitions:
+                st.warning("❌ No competitions found in database")
+                conn.close()
+                return
+
+            # Prepara opzioni per selectbox
+            competition_options = []
+            competition_map = {}
+            default_index = 0
+
+            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count) in enumerate(competitions):
+                # Formato display
+                round_str = f"R{round_num} - " if round_num else ""
+                status_str = " ✅" if is_completed else " 🔄"
+                date_str = f" ({date_start[:10]})" if date_start else ""
+
+                display_name = f"{round_str}{name} - {track}{date_str}{status_str}"
+
+                competition_options.append(display_name)
+                competition_map[display_name] = (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count)
+
+                # Default: prima competizione completata, o prima non completata se nessuna completata
+                if is_completed and default_index == 0:
+                    default_index = idx
+
+            # Selectbox competizione
+            selected_competition = st.selectbox(
+                "🏁 Select Competition:",
+                options=competition_options,
+                index=default_index,
+                key="ta_competition_select"
+            )
+
+            if selected_competition:
+                comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count = competition_map[selected_competition]
+
+                # Header competizione
+                round_str = f"Round {round_num} - " if round_num else ""
+                st.markdown(f"""
+                <div class="competition-header">
+                    <h3>⏱️ {round_str}{name}</h3>
+                    <p>📍 {track} | 📋 {weekend_format} | 📅 {date_start[:10] if date_start else 'N/A'}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Query Time Attack results
+                cursor.execute("""
+                    SELECT
+                        d.last_name,
+                        tar.best_lap_time,
+                        s.session_date,
+                        s.session_type
+                    FROM time_attack_results tar
+                    JOIN drivers d ON tar.driver_id = d.driver_id
+                    LEFT JOIN sessions s ON tar.session_id = s.session_id
+                    WHERE tar.competition_id = ?
+                        AND tar.best_lap_time IS NOT NULL
+                        AND tar.best_lap_time > 30000
+                        AND tar.best_lap_time < 3600000
+                    ORDER BY tar.best_lap_time ASC
+                """, (comp_id,))
+
+                ta_results = cursor.fetchall()
+                conn.close()
+
+                if not ta_results:
+                    st.info("ℹ️ No Time Attack results recorded for this competition")
+                    return
+
+                # Formatta risultati per visualizzazione
+                st.subheader("🏆 Time Attack Leaderboard")
+
+                # Leader time per calcolare gap
+                leader_time = ta_results[0][1]
+
+                # Crea DataFrame
+                data = []
+                for idx, (driver, lap_time, session_date, session_type) in enumerate(ta_results, 1):
+                    # Calcola gap
+                    if idx > 1:
+                        gap_ms = lap_time - leader_time
+                        gap_seconds = gap_ms / 1000.0
+                        gap_str = f"+{gap_seconds:.3f}s"
+                    else:
+                        gap_str = "-"
+
+                    # Formatta data con ora
+                    if session_date:
+                        try:
+                            from datetime import datetime
+                            date_obj = datetime.fromisoformat(session_date.replace('Z', '+00:00'))
+                            date_str = date_obj.strftime('%d/%m/%Y %H:%M')
+                        except:
+                            date_str = session_date[:16] if len(session_date) >= 16 else session_date[:10] if session_date else 'N/A'
+                    else:
+                        date_str = 'N/A'
+
+                    data.append({
+                        "Pos": "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉" if idx == 3 else str(idx),
+                        "Driver": driver,
+                        "Best Lap": self.format_lap_time(lap_time),
+                        "Gap": gap_str,
+                        "Session Type": session_type if session_type else "N/A",
+                        "Date": date_str
+                    })
+
+                df = pd.DataFrame(data)
+
+                st.dataframe(
+                    df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                # Statistiche
+                st.markdown("---")
+                st.subheader("📊 Time Attack Statistics")
+
+                # Calcola tempo medio
+                avg_time = sum(r[1] for r in ta_results) / len(ta_results)
+                leader_name = ta_results[0][0]
+                leader_time_str = self.format_lap_time(ta_results[0][1])
+                avg_time_str = self.format_lap_time(int(avg_time))
+
+                st.markdown(f"""
+                - 👥 **{len(ta_results)} Drivers with time lap**
+                - 🥇 **Leader:** {leader_name}
+                - ⚡ **Leader time:** {leader_time_str}
+                - 📈 **Average time:** {avg_time_str}
+                """)
+
+        except Exception as e:
+            st.error(f"❌ Error loading Time Attack data: {e}")
+
     def show_leagues_report(self):
         """Mostra il report leagues"""
         st.header("🌟 Leagues")
@@ -1928,9 +2100,14 @@ class ACCWebDashboard:
             except:
                 datetime_str = row['session_date'][:16] if row['session_date'] else 'N/A'
             
-            # Status ufficiale/non ufficiale
-            status = "🏆" if pd.notna(row['competition_id']) else "❌"
-            
+            # Status: Time Attack, Official, o Unofficial
+            if pd.notna(row.get('is_time_attack')) and row['is_time_attack'] == 1:
+                status = "⏱️ Time Attack"
+            elif pd.notna(row['competition_id']):
+                status = "🏆"
+            else:
+                status = "❌"
+
             # Formato: session_id - track - datetime - status
             display_name = f"{session_id} - {track_name} - {datetime_str} {status}"
             
@@ -2137,9 +2314,11 @@ class ACCWebDashboard:
             lambda x: self.format_session_type(x) if pd.notna(x) else "N/A"
         )
         
-        # Status ufficiale/non ufficiale
-        display_df['Status'] = display_df['competition_id'].apply(
-            lambda x: "🏆 Official" if pd.notna(x) else "❌ Unofficial"
+        # Status: Time Attack, Official, o Unofficial
+        display_df['Status'] = display_df.apply(
+            lambda row: "⏱️ Time Attack" if pd.notna(row.get('is_time_attack')) and row['is_time_attack'] == 1
+            else ("🏆 Official" if pd.notna(row['competition_id']) else "❌ Unofficial"),
+            axis=1
         )
         
         # Data formattata con ora
@@ -2181,19 +2360,23 @@ class ACCWebDashboard:
         
         # Info riassuntive
         total_sessions = len(final_display)
-        official_count = len(display_df[pd.notna(display_df['competition_id'])])
-        unofficial_count = total_sessions - official_count
+        time_attack_count = len(display_df[(pd.notna(display_df.get('is_time_attack'))) & (display_df['is_time_attack'] == 1)])
+        official_count = len(display_df[pd.notna(display_df['competition_id']) & ((pd.isna(display_df.get('is_time_attack'))) | (display_df['is_time_attack'] == 0))])
+        unofficial_count = total_sessions - official_count - time_attack_count
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            st.info(f"📊 **{total_sessions}** total sessions in period")
+            st.info(f"📊 **{total_sessions}** total sessions")
 
         with col2:
-            st.success(f"🏆 **{official_count}** official sessions")
+            st.success(f"🏆 **{official_count}** official")
 
         with col3:
-            st.warning(f"❌ **{unofficial_count}** unofficial sessions")
+            st.metric("⏱️ Time Attack", time_attack_count)
+
+        with col4:
+            st.warning(f"❌ **{unofficial_count}** unofficial")
 
         # Statistiche dettagliate (dopo la tabella)
         if sessions_stats:
@@ -2213,8 +2396,9 @@ class ACCWebDashboard:
             # Elenco compatto statistiche
             st.markdown(f"""
             - 🎮 **Total Sessions:** {sessions_stats['total_sessions']}
-            - 🏆 **Official Sessions:** {sessions_stats['official_sessions']}
-            - ❌ **Unofficial Sessions:** {sessions_stats['non_official_sessions']}
+            - 🏆 **Official Sessions:** {official_count}
+            - ⏱️ **Time Attack Sessions:** {time_attack_count}
+            - ❌ **Unofficial Sessions:** {unofficial_count}
             - 👥 **Unique Drivers:** {sessions_stats['unique_drivers']}
             - 🏁 **Most Used Track:** {sessions_stats['most_used_track']}
             - 📊 **Sessions on Most Used Track:** {sessions_stats['most_used_count']}
@@ -2319,6 +2503,7 @@ class ACCWebDashboard:
                 s.session_date,
                 s.total_drivers,
                 s.competition_id,
+                s.is_time_attack,
                 -- Fastest driver info (migliore giro)
                 fastest.driver_name as fastest_name,
                 fastest.best_lap as fastest_time,
@@ -3769,21 +3954,29 @@ def main():
         
         # Sidebar per navigazione
         st.sidebar.title("🏁 Navigation")
-        
+
         # Info versione per admin (solo in locale)
         if not dashboard.is_github_deployment:
             st.sidebar.markdown("---")
             st.sidebar.markdown("**🔧 Development Mode**")
             st.sidebar.markdown(f"DB: `{os.path.basename(dashboard.db_path)}`")
-        
+
+        # Inizializza session state per l'ultima pagina valida
+        if 'last_valid_page' not in st.session_state:
+            st.session_state.last_valid_page = "🏠 Homepage"
+
         # Menu principale
         page = st.sidebar.selectbox(
             "Select page:",
             [
                 "🏠 Homepage",
-                "🌟 Leagues",
+                "── LEAGUE ──",
+                "🏆 Standings",
+                "⏱️ Time Attack",
+                "── LEGACY ──",
                 "🏆 Championships",
                 "🎉 Official 4Fun",
+                "── OTHERS ──",
                 "📅 All Sessions",
                 "⚡ Best Laps",
                 "👥 Drivers",
@@ -3791,12 +3984,21 @@ def main():
             ]
         )
 
+        # Se è un separatore, usa l'ultima pagina valida
+        if page.startswith("──"):
+            page = st.session_state.last_valid_page
+        else:
+            st.session_state.last_valid_page = page
+
         # Routing pagine
         if page == "🏠 Homepage":
             dashboard.show_homepage()
 
-        elif page == "🌟 Leagues":
+        elif page == "🏆 Standings":
             dashboard.show_leagues_report()
+
+        elif page == "⏱️ Time Attack":
+            dashboard.show_time_attack_report()
 
         elif page == "🏆 Championships":
             dashboard.show_championships_report()
