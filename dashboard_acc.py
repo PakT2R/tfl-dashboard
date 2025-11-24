@@ -733,6 +733,7 @@ class ACCWebDashboard:
                     SELECT
                         d.last_name,
                         tar.best_lap_time,
+                        tar.points,
                         s.session_date,
                         s.session_type
                     FROM time_attack_results tar
@@ -760,7 +761,7 @@ class ACCWebDashboard:
 
                 # Crea DataFrame
                 data = []
-                for idx, (driver, lap_time, session_date, session_type) in enumerate(ta_results, 1):
+                for idx, (driver, lap_time, points, session_date, session_type) in enumerate(ta_results, 1):
                     # Calcola gap
                     if idx > 1:
                         gap_ms = lap_time - leader_time
@@ -785,6 +786,7 @@ class ACCWebDashboard:
                         "Driver": driver,
                         "Best Lap": self.format_lap_time(lap_time),
                         "Gap": gap_str,
+                        "Points": f"{points:.1f}" if points and points > 0 else "0.0",
                         "Session Type": session_type if session_type else "N/A",
                         "Date": date_str
                     })
