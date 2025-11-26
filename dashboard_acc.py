@@ -575,6 +575,7 @@ class ACCWebDashboard:
                 cs.race_points,
                 cs.pole_points,
                 cs.fastest_lap_points,
+                cs.time_attack_points,
                 cs.points_bonus,
                 cs.points_dropped,
                 cs.total_points,
@@ -1446,6 +1447,7 @@ class ACCWebDashboard:
             )
             results_display['pole_points'] = results_display['pole_points'].apply(lambda x: f"{int(x)}" if pd.notna(x) and x > 0 else "-")
             results_display['fastest_lap_points'] = results_display['fastest_lap_points'].apply(lambda x: f"{int(x)}" if pd.notna(x) and x > 0 else "-")
+            results_display['time_attack_points'] = results_display['time_attack_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
             # Bonus: mostra + se positivo, - se negativo, "-" se zero/null
             results_display['points_bonus'] = results_display['points_bonus'].apply(
                 lambda x: f"+{x:.1f}" if pd.notna(x) and x > 0 else (f"-{abs(x):.1f}" if pd.notna(x) and x < 0 else "-")
@@ -1464,7 +1466,7 @@ class ACCWebDashboard:
             # Seleziona colonne da mostrare nell'ordine richiesto
             columns_to_show = [
                 'Pos', 'driver', 'race_points', 'pole_points',
-                'fastest_lap_points', 'points_bonus', 'points_dropped',
+                'fastest_lap_points', 'time_attack_points', 'points_bonus', 'points_dropped',
                 'total_points', 'guests_beaten', 'beaten_by_guests'
             ]
 
@@ -1475,6 +1477,7 @@ class ACCWebDashboard:
                 'race_points': 'Race Pts',
                 'pole_points': 'Pole Pts',
                 'fastest_lap_points': 'FLap Pts',
+                'time_attack_points': 'TA Pts',
                 'points_bonus': 'Bonus Pts',
                 'points_dropped': 'Drop Pts',
                 'total_points': 'Total Pts',
@@ -1491,10 +1494,26 @@ class ACCWebDashboard:
 
             styled_display = results_display.style.apply(highlight_total, axis=0)
 
+            # Configura larghezza colonne (in pixel)
+            column_config = {
+                'Pos': st.column_config.TextColumn('Pos', width=60),
+                'Driver': st.column_config.TextColumn('Driver', width=150),
+                'Race Pts': st.column_config.TextColumn('Race Pts', width=70),
+                'Pole Pts': st.column_config.TextColumn('Pole Pts', width=70),
+                'FLap Pts': st.column_config.TextColumn('FLap Pts', width=70),
+                'TA Pts': st.column_config.TextColumn('TA Pts', width=70),
+                'Bonus Pts': st.column_config.TextColumn('Bonus Pts', width=80),
+                'Drop Pts': st.column_config.TextColumn('Drop Pts', width=70),
+                'Total Pts': st.column_config.TextColumn('Total Pts', width=80),
+                'G+': st.column_config.TextColumn('G+', width=50),
+                'G-': st.column_config.TextColumn('G-', width=50)
+            }
+
             st.dataframe(
                 styled_display,
-                use_container_width=True,
-                hide_index=True
+                use_container_width=False,
+                hide_index=True,
+                column_config=column_config
             )
         else:
             st.warning("⚠️ Competition results not yet calculated")
