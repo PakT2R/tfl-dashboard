@@ -456,6 +456,7 @@ class ACCWebDashboard:
 <p style="font-size: 1.2rem; margin: 20px 0; font-weight: 500; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Welcome to the official dashboard of the <strong>Tier Friends League</strong></p>
 <p style="font-size: 1.1rem; margin: 25px 0 15px 0; font-weight: 600; text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);">Use the menu to view:</p>
 <div style="background: rgba(255, 255, 255, 0.15); padding: 20px; border-radius: 12px; margin: 20px auto; max-width: 600px; backdrop-filter: blur(10px);">
+<p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">⏱️ <strong>Time Attack</p>
 <p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📊 <strong>Standings and Results</p>
 <p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">🏎️ <strong>Daily Casual Races</p>
 <p style="margin: 10px 0; font-size: 1.05rem; font-weight: 500;">📈 <strong>Best Recorded Laps</p>
@@ -1904,10 +1905,10 @@ class ACCWebDashboard:
             st.info(f"📊 **{total_sessions}** total sessions")
 
         with col2:
-            st.success(f"🏆 **{official_count}** official")
+            st.success(f"🏆 **{official_count}** official race")
 
         with col3:
-            st.metric("⏱️ Time Attack", time_attack_count)
+            st.info(f"⏱️ **{time_attack_count}** time attack")
 
         with col4:
             st.warning(f"❌ **{unofficial_count}** unofficial")
@@ -2836,6 +2837,7 @@ class ACCWebDashboard:
               AND l.is_valid_for_best = 1
               AND s.competition_id IS NOT NULL
               AND d.trust_level > 0
+            GROUP BY dbl.driver_id
             ORDER BY dbl.best_lap ASC
             LIMIT 50
         '''
