@@ -493,7 +493,7 @@ class ACCWebDashboard:
         - 👻 **Guest Drivers:** {stats['guest_drivers']}
         - 🏆 **Leagues:** {stats['total_leagues']}
         - 🎮 **Total Sessions:** {stats['total_sessions']}
-        - ⏱️ **Best Lap Records:** {stats['total_valid_laps']}
+        - ⏱️ **Valid Laps:** {stats['total_valid_laps']}
         """)
 
     # [Tutte le altre funzioni rimangono identiche]
@@ -655,9 +655,10 @@ class ACCWebDashboard:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            # Ottieni solo competizioni con sessioni Time Attack o risultati Time Attack
+            # Ottieni TUTTE le competizioni (come in Standings)
+            # Ordinate per data (più recenti prima)
             cursor.execute("""
-                SELECT DISTINCT
+                SELECT
                     c.competition_id,
                     c.name,
                     c.track_name,
@@ -666,18 +667,11 @@ class ACCWebDashboard:
                     c.date_end,
                     c.weekend_format,
                     c.is_completed,
-                    (SELECT COUNT(*) FROM sessions WHERE competition_id = c.competition_id AND is_time_attack = 1) as session_count
+                    (SELECT COUNT(*) FROM sessions WHERE competition_id = c.competition_id AND is_time_attack = 1) as session_count,
+                    (SELECT COUNT(*) FROM time_attack_results WHERE competition_id = c.competition_id) as results_count
                 FROM competitions c
-                WHERE EXISTS (
-                    SELECT 1 FROM sessions s
-                    WHERE s.competition_id = c.competition_id AND s.is_time_attack = 1
-                )
-                OR EXISTS (
-                    SELECT 1 FROM time_attack_results tar
-                    WHERE tar.competition_id = c.competition_id
-                )
+                GROUP BY c.competition_id
                 ORDER BY
-                    CASE WHEN c.is_completed = 1 THEN 0 ELSE 1 END,
                     CASE WHEN c.date_start IS NULL THEN 1 ELSE 0 END,
                     c.date_start DESC,
                     c.round_number DESC
@@ -695,7 +689,7 @@ class ACCWebDashboard:
             competition_map = {}
             default_index = 0
 
-            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count) in enumerate(competitions):
+            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count) in enumerate(competitions):
                 # Formato display
                 round_str = f"R{round_num} - " if round_num else ""
                 status_str = " ✅" if is_completed else " 🔄"
@@ -704,11 +698,20 @@ class ACCWebDashboard:
                 display_name = f"{round_str}{name} - {track}{date_str}{status_str}"
 
                 competition_options.append(display_name)
-                competition_map[display_name] = (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count)
+                competition_map[display_name] = (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count)
 
-                # Default: prima competizione completata, o prima non completata se nessuna completata
-                if is_completed and default_index == 0:
-                    default_index = idx
+            # Trova default index: più recente con risultati Time Attack o sessioni Time Attack
+            first_with_data_idx = None
+            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count) in enumerate(competitions):
+                if (session_count > 0 or results_count > 0) and first_with_data_idx is None:
+                    first_with_data_idx = idx
+                    break
+
+            # Seleziona la più recente con dati Time Attack, altrimenti la prima in lista
+            if first_with_data_idx is not None:
+                default_index = first_with_data_idx
+            else:
+                default_index = 0  # Fallback alla prima competizione
 
             # Selectbox competizione
             selected_competition = st.selectbox(
@@ -719,7 +722,7 @@ class ACCWebDashboard:
             )
 
             if selected_competition:
-                comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count = competition_map[selected_competition]
+                comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count = competition_map[selected_competition]
 
                 # Header competizione
                 round_str = f"Round {round_num} - " if round_num else ""
@@ -2450,33 +2453,58 @@ class ACCWebDashboard:
         # Nome pista senza decorazioni
         summary_display['Pista'] = summary_display['track_name']
 
-        # Formatta colonna Competition: "FPx - nome_competizione - campionato"
-        summary_display['Competition'] = summary_display.apply(
-            lambda row: self.format_competition_info(
-                row['session_type'],
-                row.get('competition_name'),
-                row.get('championship_name')
-            ), axis=1
+        # Formatta colonna Session Type (nascondi per Time Attack a causa di bug ACC)
+        summary_display['Session'] = summary_display.apply(
+            lambda row: "-" if row['is_time_attack'] == 1 else row['session_type'],
+            axis=1
         )
 
-        # Seleziona colonne finali
-        columns_to_show = ['Pista', 'Record', 'driver_name', 'Data', 'Competition']
+        # Formatta colonna Race Type (Official Race o Time Attack)
+        summary_display['Type'] = summary_display['is_time_attack'].apply(
+            lambda x: "⏱️ Time Attack" if x == 1 else "🏁 Official Race"
+        )
+
+        # Formatta colonna Competition: concatena competition_name e championship_name
+        summary_display['Competition'] = summary_display.apply(
+            lambda row: f"{row['competition_name']} - {row['championship_name']}"
+            if pd.notna(row.get('competition_name')) and pd.notna(row.get('championship_name'))
+            else (row.get('competition_name') if pd.notna(row.get('competition_name'))
+                  else (row.get('championship_name') if pd.notna(row.get('championship_name')) else "N/A")),
+            axis=1
+        )
+
+        # Seleziona colonne finali (Type prima di Session)
+        columns_to_show = ['Pista', 'Record', 'driver_name', 'Type', 'Session', 'Data', 'Competition']
         column_names = {
             'Pista': 'Track',
             'Record': 'Record',
             'driver_name': 'Driver',
+            'Type': 'Type',
+            'Session': 'Session',
             'Data': 'Date',
             'Competition': 'Competition'
         }
-        
+
         final_display = summary_display[columns_to_show].copy()
         final_display.columns = [column_names[col] for col in columns_to_show]
-        
+
+        # Configura larghezza colonne (in pixel)
+        column_config = {
+            'Track': st.column_config.TextColumn('Track', width=120),
+            'Record': st.column_config.TextColumn('Record', width=90),
+            'Driver': st.column_config.TextColumn('Driver', width=120),
+            'Type': st.column_config.TextColumn('Type', width=130),
+            'Session': st.column_config.TextColumn('Session', width=70),
+            'Date': st.column_config.TextColumn('Date', width=90),
+            'Competition': st.column_config.TextColumn('Competition', width='large')
+        }
+
         st.dataframe(
             final_display,
-            use_container_width=True,
+            use_container_width=False,
             hide_index=True,
-            height=400
+            height=400,
+            column_config=column_config
         )
         
         # Info aggiuntive
@@ -2540,6 +2568,7 @@ class ACCWebDashboard:
                 d.last_name as driver_name,
                 s.session_date,
                 s.session_type,
+                s.is_time_attack,
                 s.competition_id,
                 c.name as competition_name,
                 ch.name as championship_name
@@ -2655,35 +2684,61 @@ class ACCWebDashboard:
                 lambda x: self.format_session_date(x) if pd.notna(x) else "N/A"
             )
 
-            # Formatta colonna Competition: "FPx - nome_competizione - campionato"
-            leaderboard_display['Competition'] = leaderboard_display.apply(
-                lambda row: self.format_competition_info(
-                    row['session_type'],
-                    row.get('competition_name'),
-                    row.get('championship_name')
-                ), axis=1
+            # Formatta colonna Session Type (nascondi per Time Attack a causa di bug ACC)
+            leaderboard_display['Session'] = leaderboard_display.apply(
+                lambda row: "-" if row['is_time_attack'] == 1 else row['session_type'],
+                axis=1
             )
 
-            # Seleziona colonne finali
-            columns_to_show = ['Pos', 'driver_name', 'Best Time', 'Gap', 'Record Date', 'Competition']
+            # Formatta colonna Race Type (Official Race o Time Attack)
+            leaderboard_display['Type'] = leaderboard_display['is_time_attack'].apply(
+                lambda x: "⏱️ Time Attack" if x == 1 else "🏁 Official Race"
+            )
+
+            # Formatta colonna Competition: concatena competition_name e championship_name
+            leaderboard_display['Competition'] = leaderboard_display.apply(
+                lambda row: f"{row['competition_name']} - {row['championship_name']}"
+                if pd.notna(row.get('competition_name')) and pd.notna(row.get('championship_name'))
+                else (row.get('competition_name') if pd.notna(row.get('competition_name'))
+                      else (row.get('championship_name') if pd.notna(row.get('championship_name')) else "N/A")),
+                axis=1
+            )
+
+            # Seleziona colonne finali (Type prima di Session)
+            columns_to_show = ['Pos', 'driver_name', 'Best Time', 'Gap', 'Type', 'Session', 'Record Date', 'Competition']
             column_names = {
                 'Pos': 'Pos',
-                'driver_name': 'Pilota',
+                'driver_name': 'Driver',
                 'Best Time': 'Best Time',
                 'Gap': 'Gap',
-                'Record Date': 'Record Date',
+                'Type': 'Type',
+                'Session': 'Session',
+                'Record Date': 'Date',
                 'Competition': 'Competition'
             }
 
             final_display = leaderboard_display[columns_to_show].copy()
             final_display.columns = [column_names[col] for col in columns_to_show]
 
+            # Configura larghezza colonne (in pixel)
+            column_config = {
+                'Pos': st.column_config.TextColumn('Pos', width=50),
+                'Driver': st.column_config.TextColumn('Driver', width=120),
+                'Best Time': st.column_config.TextColumn('Best Time', width=90),
+                'Gap': st.column_config.TextColumn('Gap', width=70),
+                'Type': st.column_config.TextColumn('Type', width=130),
+                'Session': st.column_config.TextColumn('Session', width=70),
+                'Date': st.column_config.TextColumn('Date', width=90),
+                'Competition': st.column_config.TextColumn('Competition', width='large')
+            }
+
             # Mostra tabella con evidenziazione primi 3
             st.dataframe(
                 final_display,
-                use_container_width=True,
+                use_container_width=False,
                 hide_index=True,
-                height=500
+                height=500,
+                column_config=column_config
             )
 
         else:
@@ -2843,6 +2898,7 @@ class ACCWebDashboard:
                 dbl.best_lap,
                 s.session_date,
                 s.session_type,
+                s.is_time_attack,
                 s.competition_id,
                 c.name as competition_name,
                 ch.name as championship_name
