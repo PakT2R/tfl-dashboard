@@ -585,8 +585,8 @@ class ACCWebDashboard:
             FROM competition_standings cs
             JOIN drivers d ON cs.driver_id = d.driver_id
             WHERE cs.competition_id = ?
+                AND d.trust_level > 0
             ORDER BY cs.total_points DESC,
-                     CASE WHEN cs.total_points = 0 THEN d.trust_level ELSE 0 END DESC,
                      cs.race_points DESC
         """
 
@@ -629,18 +629,19 @@ class ACCWebDashboard:
     def get_session_results(self, session_id: str) -> pd.DataFrame:
         """Ottiene risultati sessione"""
         query = """
-            SELECT 
+            SELECT
                 sr.position,
                 sr.race_number,
                 d.last_name as driver,
                 sr.lap_count,
                 sr.best_lap,
                 sr.total_time,
-                sr.is_spectator
+                sr.is_spectator,
+                d.trust_level
             FROM session_results sr
             JOIN drivers d ON sr.driver_id = d.driver_id
             WHERE sr.session_id = ?
-            ORDER BY 
+            ORDER BY
                 CASE WHEN sr.position IS NULL THEN 1 ELSE 0 END,
                 sr.position
         """
@@ -888,6 +889,7 @@ class ACCWebDashboard:
                 default_league_index = 0  # Fallback alla prima league
 
             # Selectbox league
+            st.subheader("Leagues")
             selected_league_display = st.selectbox(
                 "Select a League:",
                 league_options,
@@ -946,7 +948,7 @@ class ACCWebDashboard:
                 st.markdown(header_html, unsafe_allow_html=True)
 
                 # Classifica league
-                st.subheader("📊 League Standings")
+                st.subheader("League Standings")
 
                 query_standings = """
                     SELECT
@@ -1008,18 +1010,38 @@ class ACCWebDashboard:
 
                     styled_league = df_display.style.apply(highlight_total_league, axis=0)
 
+                    # Configura larghezza colonne (in pixel)
+                    column_config = {
+                        'Pos': st.column_config.TextColumn('Pos', width=60),
+                        'Driver': st.column_config.TextColumn('Driver', width=150),
+                        'n Tiers': st.column_config.TextColumn('n Tiers', width=70),
+                        'n Wins': st.column_config.TextColumn('n Wins', width=70),
+                        'n Pods': st.column_config.TextColumn('n Pods', width=70),
+                        'n Pole': st.column_config.TextColumn('n Pole', width=70),
+                        'n FLap': st.column_config.TextColumn('n FLap', width=70),
+                        'Tier 1 Pts': st.column_config.TextColumn('Tier 1 Pts', width=80),
+                        'Tier 2 Pts': st.column_config.TextColumn('Tier 2 Pts', width=80),
+                        'Tier 3 Pts': st.column_config.TextColumn('Tier 3 Pts', width=80),
+                        'Tier 4 Pts': st.column_config.TextColumn('Tier 4 Pts', width=80),
+                        'CV%': st.column_config.TextColumn('CV%', width=70),
+                        'Consist Pts': st.column_config.TextColumn('Consist Pts', width=90),
+                        'Total Pts': st.column_config.TextColumn('Total Pts', width=80)
+                    }
+
                     # Mostra tabella
                     st.dataframe(
                         styled_league,
-                        use_container_width=True,
-                        hide_index=True
+                        use_container_width=False,
+                        hide_index=True,
+                        column_config=column_config,
+                        height=35 * len(df_display) + 38
                     )
                 else:
                     st.info("No standings available for this league yet")
 
                 # Selezione tier (championships)
                 st.markdown("---")
-                st.subheader("🏆 League Tiers")
+                st.subheader("Tiers")
 
                 # Ottieni championships (tier) della lega con conteggio standing
                 cursor.execute("""
@@ -1075,7 +1097,7 @@ class ACCWebDashboard:
 
                     # Selectbox tier
                     selected_tier = st.selectbox(
-                        "🏆 Select Tier:",
+                        "Select a Tier:",
                         options=tier_options,
                         index=default_tier_index,
                         key="tier_select"
@@ -1110,7 +1132,7 @@ class ACCWebDashboard:
                             st.markdown(tier_header, unsafe_allow_html=True)
 
                             # Classifica tier championship
-                            st.subheader("📊 Tier Leaderboard")
+                            st.subheader("Tier Standings")
                             standings_df = self.get_championship_standings(tier_championship_id)
 
                             if not standings_df.empty:
@@ -1202,12 +1224,31 @@ class ACCWebDashboard:
 
                                 styled_standings = standings_display.style.apply(highlight_total_champ, axis=0)
 
-                                # Mostra tabella senza indice e con altezza fissa
+                                # Configura larghezza colonne (in pixel)
+                                column_config = {
+                                    'Pos': st.column_config.TextColumn('Pos', width=60),
+                                    'Driver': st.column_config.TextColumn('Driver', width=150),
+                                    'Races': st.column_config.TextColumn('Races', width=70),
+                                    'Wins': st.column_config.TextColumn('Wins', width=60),
+                                    'Pods': st.column_config.TextColumn('Pods', width=60),
+                                    'Pole': st.column_config.TextColumn('Pole', width=60),
+                                    'FL': st.column_config.TextColumn('FL', width=50),
+                                    'Gross Pts': st.column_config.TextColumn('Gross Pts', width=80),
+                                    'Drop Pts': st.column_config.TextColumn('Drop Pts', width=70),
+                                    'Base Pts': st.column_config.TextColumn('Base Pts', width=80),
+                                    'Mult': st.column_config.TextColumn('Mult', width=60),
+                                    'Bonus Pts': st.column_config.TextColumn('Bonus Pts', width=80),
+                                    'Pen Pts': st.column_config.TextColumn('Pen Pts', width=70),
+                                    'Total Pts': st.column_config.TextColumn('Total Pts', width=80)
+                                }
+
+                                # Mostra tabella senza indice e con altezza dinamica
                                 st.dataframe(
                                     styled_standings,
-                                    use_container_width=True,
+                                    use_container_width=False,
                                     hide_index=True,
-                                    height=400
+                                    column_config=column_config,
+                                    height=35 * len(standings_display) + 38
                                 )
 
                             else:
@@ -1354,7 +1395,7 @@ class ACCWebDashboard:
 
     def show_competition_selection(self, championship_id: int):
         """Mostra selezione e dettagli competizione"""
-        st.subheader("🏁 Tier / Championship Competitions")
+        st.subheader("Competitions")
         
         # Ottieni competizioni
         competitions = self.get_championship_competitions(championship_id)
@@ -1395,7 +1436,7 @@ class ACCWebDashboard:
 
         # Selectbox competizione
         selected_competition = st.selectbox(
-            "🏁 Select Competition:",
+            "Select a Competition:",
             options=competition_options,
             index=default_index,
             key="competition_select"
@@ -1427,7 +1468,7 @@ class ACCWebDashboard:
         """, unsafe_allow_html=True)
         
         # Risultati competizione
-        st.subheader("🏆 Competition Leaderboard")
+        st.subheader("Competition Leaderboard")
         results_df = self.get_competition_results(competition_id)
 
         if not results_df.empty:
@@ -1516,14 +1557,15 @@ class ACCWebDashboard:
                 styled_display,
                 use_container_width=False,
                 hide_index=True,
-                column_config=column_config
+                column_config=column_config,
+                height=35 * len(results_display) + 38
             )
         else:
             st.warning("⚠️ Competition results not yet calculated")
         
         # Sessioni della competizione
         st.markdown("---")
-        st.subheader("🎮 Competition Sessions")
+        st.subheader("Session Results")
 
         sessions = self.get_competition_sessions(competition_id)
 
@@ -1566,26 +1608,59 @@ class ACCWebDashboard:
                     session_display['Total Time'] = session_display['total_time'].apply(
                         lambda x: self.format_lap_time(x) if pd.notna(x) else "N/A"
                     )
-                    
-                    # Seleziona colonne da mostrare
-                    columns_to_show = ['Pos', 'race_number', 'driver', 'lap_count', 'Best Lap', 'Total Time']
+
+                    # Crea colonna Type con icona (persona per registrati, ghost per guest)
+                    session_display['Type'] = session_display['trust_level'].apply(
+                        lambda x: "👤" if x > 0 else "👻"
+                    )
+
+                    # Seleziona colonne da mostrare (con Type dopo Driver)
+                    columns_to_show = ['Pos', 'race_number', 'driver', 'Type', 'lap_count', 'Best Lap', 'Total Time', 'trust_level']
                     column_names = {
                         'Pos': 'Pos',
                         'race_number': 'Num#',
                         'driver': 'Driver',
+                        'Type': 'Type',
                         'lap_count': 'Laps',
                         'Best Lap': 'Best Lap',
-                        'Total Time': 'Total Time'
+                        'Total Time': 'Total Time',
+                        'trust_level': 'trust_level'  # Manteniamo per lo stile
                     }
-                    
+
                     session_display = session_display[columns_to_show]
                     session_display.columns = [column_names[col] for col in columns_to_show]
-                    
-                    # Mostra tutti i risultati senza limitazioni
+
+                    # Rimuovi colonna trust_level dalla visualizzazione finale
+                    final_columns = ['Pos', 'Num#', 'Driver', 'Type', 'Laps', 'Best Lap', 'Total Time']
+                    session_display_final = session_display.drop(columns=['trust_level'])
+                    session_display_final.columns = final_columns
+
+                    # Applica stile: guest in grigio (colora tutte le colonne tranne Pos e Status)
+                    styled_session_final = session_display_final.style.apply(
+                        lambda row: [''] + ['color: #999999;'] + ['color: #999999;'] + [''] + (['color: #999999;'] * 3)
+                        if session_display.loc[row.name, 'trust_level'] == 0
+                        else [''] * 7,
+                        axis=1
+                    )
+
+                    # Configura larghezza colonne (in pixel)
+                    column_config = {
+                        'Pos': st.column_config.TextColumn('Pos', width=60),
+                        'Num#': st.column_config.TextColumn('Num#', width=60),
+                        'Driver': st.column_config.TextColumn('Driver', width=150),
+                        'Type': st.column_config.TextColumn('Type', width=60),
+                        'Laps': st.column_config.TextColumn('Laps', width=60),
+                        'Best Lap': st.column_config.TextColumn('Best Lap', width=100),
+                        'Total Time': st.column_config.TextColumn('Total Time', width=100)
+                    }
+
+                    # Mostra tutti i risultati con altezza dinamica e stile
                     st.dataframe(
-                        session_display,
-                        use_container_width=True,
-                        hide_index=True
+                        styled_session_final,
+                        use_container_width=False,
+                        hide_index=True,
+                        column_config=column_config,
+                        height=35 * len(session_display_final) + 38
                     )
                 else:
                     st.warning(f"⚠️ No results found for {session_type}")
