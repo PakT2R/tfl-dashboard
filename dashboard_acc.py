@@ -1197,7 +1197,7 @@ class ACCWebDashboard:
     
     def show_leagues_report(self):
         """Mostra il report leagues"""
-        st.header("🏆 Standings")
+        st.header("Standings")
 
         # Ottieni lista leagues con conteggio standing
         try:
@@ -1261,7 +1261,7 @@ class ACCWebDashboard:
             # Selectbox league
             st.subheader("Leagues")
             selected_league_display = st.selectbox(
-                "Select a League:",
+                "🌟 Select a League:",
                 league_options,
                 index=default_league_index,
                 key="league_selector"
@@ -1318,7 +1318,7 @@ class ACCWebDashboard:
                 st.markdown(header_html, unsafe_allow_html=True)
 
                 # Classifica league
-                st.subheader("League Standings")
+                st.subheader("🌟 League Standings")
 
                 query_standings = """
                     SELECT
@@ -1467,7 +1467,7 @@ class ACCWebDashboard:
 
                     # Selectbox tier
                     selected_tier = st.selectbox(
-                        "Select a Tier:",
+                        "🏆 Select a Tier:",
                         options=tier_options,
                         index=default_tier_index,
                         key="tier_select"
@@ -1502,7 +1502,7 @@ class ACCWebDashboard:
                             st.markdown(tier_header, unsafe_allow_html=True)
 
                             # Classifica tier championship
-                            st.subheader("Tier Standings")
+                            st.subheader("🏆 Tier Standings")
                             standings_df = self.get_championship_standings(tier_championship_id)
 
                             if not standings_df.empty:
