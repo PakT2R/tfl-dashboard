@@ -680,8 +680,13 @@ class ACCWebDashboard:
                     c.weekend_format,
                     c.is_completed,
                     (SELECT COUNT(*) FROM sessions WHERE competition_id = c.competition_id AND is_time_attack = 1) as session_count,
-                    (SELECT COUNT(*) FROM time_attack_results WHERE competition_id = c.competition_id) as results_count
+                    (SELECT COUNT(*) FROM time_attack_results WHERE competition_id = c.competition_id) as results_count,
+                    l.name as league_name,
+                    ch.tier_number,
+                    ch.name as tier_name
                 FROM competitions c
+                LEFT JOIN championships ch ON c.championship_id = ch.championship_id
+                LEFT JOIN leagues l ON ch.league_id = l.league_id
                 GROUP BY c.competition_id
                 ORDER BY
                     CASE WHEN c.date_start IS NULL THEN 1 ELSE 0 END,
@@ -701,7 +706,7 @@ class ACCWebDashboard:
             competition_map = {}
             default_index = 0
 
-            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count) in enumerate(competitions):
+            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count, league_name, tier_number, tier_name) in enumerate(competitions):
                 # Formato display
                 round_str = f"R{round_num} - " if round_num else ""
                 status_str = " ✅" if is_completed else " 🔄"
@@ -710,11 +715,11 @@ class ACCWebDashboard:
                 display_name = f"{round_str}{name} - {track}{date_str}{status_str}"
 
                 competition_options.append(display_name)
-                competition_map[display_name] = (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count)
+                competition_map[display_name] = (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count, league_name, tier_number, tier_name)
 
             # Trova default index: più recente con risultati Time Attack o sessioni Time Attack
             first_with_data_idx = None
-            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count) in enumerate(competitions):
+            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count, league_name, tier_number, tier_name) in enumerate(competitions):
                 if (session_count > 0 or results_count > 0) and first_with_data_idx is None:
                     first_with_data_idx = idx
                     break
@@ -734,7 +739,7 @@ class ACCWebDashboard:
             )
 
             if selected_competition:
-                comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count = competition_map[selected_competition]
+                comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count, league_name, tier_number, tier_name = competition_map[selected_competition]
 
                 # Header competizione
                 round_str = f"Round {round_num} - " if round_num else ""
@@ -751,10 +756,16 @@ class ACCWebDashboard:
 
                 date_range = f"{date_start[:10] if date_start else 'N/A'} - {date_end_display}"
 
+                # League and tier info
+                league_str = f"{league_name}" if league_name else "No League"
+                tier_str = f"Tier {tier_number} - {tier_name}" if tier_number and tier_name else (f"Tier {tier_number}" if tier_number else "")
+
                 st.markdown(f"""
                 <div class="competition-header">
+                    <p style="margin: 0 0 8px 0; font-size: 1.3rem; font-weight: 600; color: #FF6B35;">{league_str}</p>
+                    <p style="margin: 0 0 15px 0; font-size: 1.1rem; font-weight: 500; color: #4ECDC4;">{tier_str}</p>
                     <h3>⏱️ {round_str}{name}</h3>
-                    <p>📍 {track} | 📋 Time Attack | 📅 {date_range}</p>
+                    <p>📍 {track} | 📅 {date_range}</p>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -931,9 +942,14 @@ class ACCWebDashboard:
                     c.date_end,
                     c.weekend_format,
                     c.is_completed,
-                    (SELECT COUNT(*) FROM sessions WHERE competition_id = c.competition_id) as session_count,
-                    (SELECT COUNT(*) FROM competition_standings WHERE competition_id = c.competition_id) as results_count
+                    (SELECT COUNT(*) FROM sessions WHERE competition_id = c.competition_id AND (is_time_attack = 0 OR is_time_attack IS NULL)) as session_count,
+                    (SELECT COUNT(*) FROM competition_standings WHERE competition_id = c.competition_id) as results_count,
+                    l.name as league_name,
+                    ch.tier_number,
+                    ch.name as tier_name
                 FROM competitions c
+                LEFT JOIN championships ch ON c.championship_id = ch.championship_id
+                LEFT JOIN leagues l ON ch.league_id = l.league_id
                 GROUP BY c.competition_id
                 ORDER BY
                     CASE WHEN c.date_start IS NULL THEN 1 ELSE 0 END,
@@ -953,7 +969,7 @@ class ACCWebDashboard:
             competition_map = {}
             default_index = 0
 
-            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count) in enumerate(competitions):
+            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count, league_name, tier_number, tier_name) in enumerate(competitions):
                 # Formato display
                 round_str = f"R{round_num} - " if round_num else ""
                 status_str = " ✅" if is_completed else " 🔄"
@@ -962,11 +978,11 @@ class ACCWebDashboard:
                 display_name = f"{round_str}{name} - {track}{date_str}{status_str}"
 
                 competition_options.append(display_name)
-                competition_map[display_name] = (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count)
+                competition_map[display_name] = (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count, league_name, tier_number, tier_name)
 
             # Trova default index: più recente con risultati o sessioni
             first_with_data_idx = None
-            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count) in enumerate(competitions):
+            for idx, (comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count, league_name, tier_number, tier_name) in enumerate(competitions):
                 if (session_count > 0 or results_count > 0) and first_with_data_idx is None:
                     first_with_data_idx = idx
                     break
@@ -986,15 +1002,21 @@ class ACCWebDashboard:
             )
 
             if selected_competition:
-                comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count = competition_map[selected_competition]
+                comp_id, name, track, round_num, date_start, date_end, weekend_format, is_completed, session_count, results_count, league_name, tier_number, tier_name = competition_map[selected_competition]
 
                 # Header competizione
                 round_str = f"Round {round_num} - " if round_num else ""
                 # Mostra solo data fine (senza meno un giorno)
                 date_display = date_end[:10] if date_end else 'N/A'
 
+                # League and tier info
+                league_str = f"{league_name}" if league_name else "No League"
+                tier_str = f"Tier {tier_number} - {tier_name}" if tier_number and tier_name else (f"Tier {tier_number}" if tier_number else "")
+
                 st.markdown(f"""
                 <div class="competition-header">
+                    <p style="margin: 0 0 8px 0; font-size: 1.3rem; font-weight: 600; color: #FF6B35;">{league_str}</p>
+                    <p style="margin: 0 0 15px 0; font-size: 1.1rem; font-weight: 500; color: #4ECDC4;">{tier_str}</p>
                     <h3>🏁 {round_str}{name}</h3>
                     <p>📍 {track} | 📋 {weekend_format} | 📅 {date_display}</p>
                 </div>
@@ -1074,7 +1096,7 @@ class ACCWebDashboard:
 
                 # Sessioni della competizione
                 st.markdown("---")
-                st.subheader("Session Results")
+                st.subheader("📊 Session Results")
 
                 sessions = self.get_competition_sessions(comp_id)
 
@@ -1090,9 +1112,10 @@ class ACCWebDashboard:
                         # Header sessione
                         best_lap_text = f'⚡ Best: {self.format_lap_time(best_lap_overall)} ({best_lap_driver})' if best_lap_overall and best_lap_driver else (f'⚡ Best: {self.format_lap_time(best_lap_overall)}' if best_lap_overall else '')
                         st.markdown(f"""
-                        <div class="session-header">
-                            <strong>🏁 {session_type}</strong> - {date_str} | 👥 {total_drivers} drivers
-                            {f'| {best_lap_text}' if best_lap_text else ''}
+                        <div style="background: #5a5a5a; padding: 12px 16px; border-radius: 8px; margin: 15px 0 10px 0; border-left: 4px solid #888;">
+                            <p style="margin: 0; color: #ffffff; font-size: 1.05rem; font-weight: 600;">
+                                🏁 {session_type} <span style="font-weight: 400; opacity: 0.9;">- {date_str} | 👥 {total_drivers} drivers{f' | {best_lap_text}' if best_lap_text else ''}</span>
+                            </p>
                         </div>
                         """, unsafe_allow_html=True)
 
@@ -1285,13 +1308,12 @@ class ACCWebDashboard:
                 name, season, start_date, end_date, total_tiers, is_completed, description = league_info
 
                 # Header league con stile championship-header
-                season_info = f" - Stagione {season}" if season else ""
                 status_icon = "✅" if is_completed else "🔄"
 
                 # Costruisci l'HTML completo
                 header_html = f"""
                 <div class="championship-header">
-                    <h2>🌟 {name}{season_info} {status_icon}</h2>
+                    <h2>🌟 {name} {status_icon}</h2>
                 """
 
                 if description:
@@ -1401,9 +1423,8 @@ class ACCWebDashboard:
                     # Mostra tabella
                     st.dataframe(
                         styled_league,
-                        use_container_width=False,
+                        use_container_width=True,
                         hide_index=True,
-                        column_config=column_config,
                         height=35 * len(df_display) + 38
                     )
                 else:
@@ -1615,9 +1636,8 @@ class ACCWebDashboard:
                                 # Mostra tabella senza indice e con altezza dinamica
                                 st.dataframe(
                                     styled_standings,
-                                    use_container_width=False,
+                                    use_container_width=True,
                                     hide_index=True,
-                                    column_config=column_config,
                                     height=35 * len(standings_display) + 38
                                 )
 
@@ -1631,6 +1651,21 @@ class ACCWebDashboard:
                 st.subheader("📈 Daily Participation Trend")
 
                 try:
+                    # Query per ottenere le date di fine competizione
+                    cursor.execute("""
+                        SELECT DISTINCT c.date_end, c.name
+                        FROM competitions c
+                        WHERE c.championship_id IN (
+                            SELECT championship_id
+                            FROM championships
+                            WHERE league_id = ?
+                        )
+                        AND c.date_end IS NOT NULL
+                        ORDER BY c.date_end ASC
+                    """, (selected_league_id,))
+
+                    competition_end_dates = cursor.fetchall()
+
                     # Query per contare partecipanti unici per giorno (separati per registrati e guest)
                     cursor.execute("""
                         SELECT
@@ -1702,6 +1737,39 @@ class ACCWebDashboard:
                             hovertemplate='<b>Guests:</b> %{y}<extra></extra>'
                         ))
 
+                        # Aggiungi shapes (linee verticali) per le date di fine competizione
+                        shapes = []
+                        added_dates = set()  # Per evitare duplicati
+                        for date_end, comp_name in competition_end_dates:
+                            try:
+                                # Converti date_end (YYYY-MM-DD) in formato visualizzato nel grafico (dd/mm/YYYY)
+                                if 'T' in date_end or 'Z' in date_end:
+                                    date_obj = datetime.fromisoformat(date_end.replace('Z', '+00:00'))
+                                else:
+                                    date_obj = datetime.strptime(date_end, "%Y-%m-%d")
+
+                                formatted_date = date_obj.strftime("%d/%m/%Y")
+
+                                # Aggiungi shape solo se la data esiste nell'asse X e non è già presente
+                                if formatted_date in dates and formatted_date not in added_dates:
+                                    shapes.append(dict(
+                                        type="line",
+                                        x0=formatted_date,
+                                        x1=formatted_date,
+                                        y0=0,
+                                        y1=1,
+                                        yref="paper",
+                                        line=dict(
+                                            color="rgba(255, 165, 0, 0.6)",
+                                            width=2,
+                                            dash="dash"
+                                        )
+                                    ))
+                                    added_dates.add(formatted_date)
+                            except Exception as e:
+                                # Se la conversione fallisce, salta questa data
+                                pass
+
                         fig.update_layout(
                             title={
                                 'text': 'Daily Unique Participants (Registered vs Guests)',
@@ -1728,7 +1796,8 @@ class ACCWebDashboard:
                             ),
                             yaxis=dict(
                                 rangemode='tozero'
-                            )
+                            ),
+                            shapes=shapes
                         )
 
                         st.plotly_chart(fig, use_container_width=True)
