@@ -10,6 +10,7 @@ import sqlite3
 import json
 import pandas as pd
 import os
+import requests
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -585,6 +586,38 @@ class ACCWebDashboard:
             - `acc_config_d.json` (template)
             """)
 
+    def show_daily_article(self):
+        """Mostra l'articolo del giorno caricato da GitHub"""
+        import requests
+
+        st.subheader("📰 Articolo del Giorno")
+
+        try:
+            # URL GitHub raw per daily_article.html
+            github_config = self.config.get('github', {})
+            username = github_config.get('username', 'PakT2R')
+            repo = github_config.get('repository', 'tfl-dashboard')
+            branch = github_config.get('branch', 'main')
+
+            article_url = f"https://raw.githubusercontent.com/{username}/{repo}/{branch}/daily_article.html"
+
+            # Carica articolo da GitHub
+            response = requests.get(article_url, timeout=5)
+
+            if response.status_code == 200:
+                # Mostra HTML dell'articolo
+                st.components.v1.html(response.text, height=800, scrolling=True)
+            else:
+                st.info("📝 Nessun articolo disponibile al momento. Torna presto per nuovi aggiornamenti!")
+
+        except requests.exceptions.RequestException as e:
+            # In caso di errore di rete, mostra messaggio generico
+            st.info("📝 Articolo temporaneamente non disponibile. Riprova più tardi!")
+        except Exception as e:
+            # Altri errori: mostra in locale, ignora in produzione
+            if not self.is_github_deployment:
+                st.warning(f"⚠️ Errore caricamento articolo: {str(e)}")
+
     def show_homepage(self):
         """Mostra la homepage con statistiche generali"""
         # Indicatore ambiente (solo locale)
@@ -653,6 +686,10 @@ class ACCWebDashboard:
         - 🎮 **Total Sessions:** {stats['total_sessions']}
         - ⏱️ **Valid Laps:** {stats['total_valid_laps']}
         """)
+
+        # Articolo del giorno
+        st.markdown("---")
+        self.show_daily_article()
 
     # [Tutte le altre funzioni rimangono identiche]
 
