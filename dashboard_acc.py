@@ -587,10 +587,10 @@ class ACCWebDashboard:
             """)
 
     def show_daily_article(self):
-        """Mostra l'articolo del giorno caricato da GitHub"""
+        """Mostra la rassegna stampa caricata da GitHub"""
         import requests
 
-        st.subheader("📰 Articolo del Giorno")
+        st.subheader("📰 Rassegna Stampa")
 
         try:
             # URL GitHub raw per daily_article.html
@@ -687,7 +687,7 @@ class ACCWebDashboard:
         - ⏱️ **Valid Laps:** {stats['total_valid_laps']}
         """)
 
-        # Articolo del giorno
+        # Rassegna Stampa
         st.markdown("---")
         self.show_daily_article()
 
