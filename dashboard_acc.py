@@ -811,9 +811,11 @@ class ACCWebDashboard:
                     SELECT
                         d.last_name,
                         tar.best_lap_time,
+                        tar.best_split1,
+                        tar.best_split2,
+                        tar.best_split3,
                         tar.points,
-                        s.session_date,
-                        s.session_type
+                        s.session_date
                     FROM time_attack_results tar
                     JOIN drivers d ON tar.driver_id = d.driver_id
                     LEFT JOIN sessions s ON tar.session_id = s.session_id
@@ -839,7 +841,7 @@ class ACCWebDashboard:
 
                 # Crea DataFrame
                 data = []
-                for idx, (driver, lap_time, points, session_date, session_type) in enumerate(ta_results, 1):
+                for idx, (driver, lap_time, split1, split2, split3, points, session_date) in enumerate(ta_results, 1):
                     # Calcola gap
                     if idx > 1:
                         gap_ms = lap_time - leader_time
@@ -847,6 +849,16 @@ class ACCWebDashboard:
                         gap_str = f"+{gap_seconds:.3f}s"
                     else:
                         gap_str = "-"
+
+                    # Formatta splits (da milliseconds a secondi)
+                    def format_split(split_ms):
+                        if split_ms is None or split_ms == 0:
+                            return "-"
+                        return f"{split_ms / 1000:.3f}s"
+
+                    split1_str = format_split(split1)
+                    split2_str = format_split(split2)
+                    split3_str = format_split(split3)
 
                     # Formatta data con ora
                     if session_date:
@@ -862,10 +874,12 @@ class ACCWebDashboard:
                     data.append({
                         "Pos": str(idx),
                         "Driver": driver,
-                        "Best Lap": self.format_lap_time(lap_time),
-                        "Gap": gap_str,
                         "Points": f"{points:.1f}" if points and points > 0 else "0.0",
-                        "Session Type": session_type if session_type else "N/A",
+                        "Best Lap": self.format_lap_time(lap_time),
+                        "S1": split1_str,
+                        "S2": split2_str,
+                        "S3": split3_str,
+                        "Gap": gap_str,
                         "Date": date_str
                     })
 
