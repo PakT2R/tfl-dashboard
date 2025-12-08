@@ -885,10 +885,20 @@ class ACCWebDashboard:
 
                 df = pd.DataFrame(data)
 
+                # Calcola altezza per mostrare almeno 15 piloti senza scroll
+                # ~35px per riga + ~38px per header
+                min_rows = 15
+                row_height = 35
+                header_height = 38
+                num_rows = len(df)
+                display_rows = max(min_rows, num_rows)
+                table_height = (display_rows * row_height) + header_height
+
                 st.dataframe(
                     df,
                     use_container_width=True,
-                    hide_index=True
+                    hide_index=True,
+                    height=table_height
                 )
 
                 # Statistiche
