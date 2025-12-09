@@ -836,19 +836,29 @@ class ACCWebDashboard:
                 # Formatta risultati per visualizzazione
                 st.subheader("⏱️ Time Attack Leaderboard")
 
-                # Leader time per calcolare gap
-                leader_time = ta_results[0][1]
+                # Determina se la competizione è scaduta (data sistema > date_end - 1 giorno)
+                from datetime import datetime, timedelta
+                is_expired = False
+                if date_end:
+                    try:
+                        end_date = datetime.strptime(date_end, '%Y-%m-%d')
+                        deadline = end_date - timedelta(days=1)
+                        is_expired = datetime.now() > deadline
+                    except:
+                        is_expired = False
 
                 # Crea DataFrame
                 data = []
+                prev_time = None
                 for idx, (driver, lap_time, split1, split2, split3, points, session_date) in enumerate(ta_results, 1):
-                    # Calcola gap
-                    if idx > 1:
-                        gap_ms = lap_time - leader_time
+                    # Calcola gap rispetto al pilota che precede
+                    if idx > 1 and prev_time is not None:
+                        gap_ms = lap_time - prev_time
                         gap_seconds = gap_ms / 1000.0
                         gap_str = f"+{gap_seconds:.3f}s"
                     else:
                         gap_str = "-"
+                    prev_time = lap_time
 
                     # Formatta splits (da milliseconds a secondi)
                     def format_split(split_ms):
@@ -876,10 +886,10 @@ class ACCWebDashboard:
                         "Driver": driver,
                         "Points": f"{points:.1f}" if points and points > 0 else "0.0",
                         "Best Lap": self.format_lap_time(lap_time),
+                        "Gap": gap_str,
                         "S1": split1_str,
                         "S2": split2_str,
                         "S3": split3_str,
-                        "Gap": gap_str,
                         "Date": date_str
                     })
 
@@ -894,29 +904,70 @@ class ACCWebDashboard:
                 display_rows = max(min_rows, num_rows)
                 table_height = (display_rows * row_height) + header_height
 
+                # Applica colore alla colonna Points: rosso se scaduta, verde altrimenti (in grassetto)
+                points_style = 'color: #FF4444; font-weight: bold' if is_expired else 'color: #44BB44; font-weight: bold'
+                styled_df = df.style.applymap(lambda x: points_style, subset=['Points'])
+
                 st.dataframe(
-                    df,
+                    styled_df,
                     use_container_width=True,
                     hide_index=True,
                     height=table_height
                 )
 
-                # Statistiche
+                # Grafico scostamento dal tempo medio
                 st.markdown("---")
-                st.subheader("📊 Time Attack Statistics")
+
+                import plotly.graph_objects as go
 
                 # Calcola tempo medio
-                avg_time = sum(r[1] for r in ta_results) / len(ta_results)
-                leader_name = ta_results[0][0]
-                leader_time_str = self.format_lap_time(ta_results[0][1])
-                avg_time_str = self.format_lap_time(int(avg_time))
+                avg_time = sum(r[1] for r in ta_results) / len(ta_results) / 1000  # in secondi
+                avg_time_str = self.format_lap_time(int(avg_time * 1000))
 
-                st.markdown(f"""
-                - 👥 **{len(ta_results)} Drivers with time lap**
-                - ⏱️ **Leader:** {leader_name}
-                - ⚡ **Leader time:** {leader_time_str}
-                - 📈 **Average time:** {avg_time_str}
-                """)
+                st.subheader(f"📊 Deviation from Average Lap Time ({avg_time_str})")
+
+                # Prepara dati piloti con scostamento (ordinati dal più veloce al più lento)
+                pilot_data = []
+                for driver, lap_time, split1, split2, split3, points, session_date in ta_results:
+                    time_sec = lap_time / 1000
+                    deviation = time_sec - avg_time
+                    pilot_data.append({'driver': driver, 'deviation': deviation})
+
+                # Ordina dal più lento (in alto) al più veloce (in basso) per visualizzazione
+                pilot_data.reverse()
+
+                drivers = [p['driver'] for p in pilot_data]
+                deviations = [p['deviation'] for p in pilot_data]
+                colors = ['#44BB44' if d < 0 else '#FF4444' for d in deviations]
+
+                fig = go.Figure()
+
+                fig.add_trace(go.Bar(
+                    y=drivers,
+                    x=deviations,
+                    orientation='h',
+                    marker_color=colors,
+                    text=[f"{d:+.3f}s" for d in deviations],
+                    textposition='outside',
+                    textfont=dict(color='white', size=11),
+                    hovertemplate='%{y}<br>%{x:+.3f}s<extra></extra>'
+                ))
+
+                fig.update_layout(
+                    xaxis_title='Deviation from Average (seconds)',
+                    yaxis_title='',
+                    height=max(400, len(drivers) * 30 + 100),
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='white'),
+                    showlegend=False,
+                    xaxis=dict(zeroline=True, zerolinewidth=2, zerolinecolor='white'),
+                    bargap=0.3
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
+                st.caption("🟢 Faster than avg | 🔴 Slower than avg")
 
         except Exception as e:
             st.error(f"❌ Error loading Time Attack data: {e}")
