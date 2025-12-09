@@ -815,10 +815,12 @@ class ACCWebDashboard:
                         tar.best_split2,
                         tar.best_split3,
                         tar.points,
-                        s.session_date
+                        s.session_date,
+                        COALESCE(cm.car_name, tar.car_model) as car_name
                     FROM time_attack_results tar
                     JOIN drivers d ON tar.driver_id = d.driver_id
                     LEFT JOIN sessions s ON tar.session_id = s.session_id
+                    LEFT JOIN car_models cm ON tar.car_model = cm.car_model
                     WHERE tar.competition_id = ?
                         AND tar.best_lap_time IS NOT NULL
                         AND tar.best_lap_time > 30000
@@ -850,7 +852,7 @@ class ACCWebDashboard:
                 # Crea DataFrame
                 data = []
                 prev_time = None
-                for idx, (driver, lap_time, split1, split2, split3, points, session_date) in enumerate(ta_results, 1):
+                for idx, (driver, lap_time, split1, split2, split3, points, session_date, car_name) in enumerate(ta_results, 1):
                     # Calcola gap rispetto al pilota che precede
                     if idx > 1 and prev_time is not None:
                         gap_ms = lap_time - prev_time
@@ -884,6 +886,7 @@ class ACCWebDashboard:
                     data.append({
                         "Pos": str(idx),
                         "Driver": driver,
+                        "Car": car_name if car_name else "-",
                         "Points": f"{points:.1f}" if points and points > 0 else "0.0",
                         "Best Lap": self.format_lap_time(lap_time),
                         "Gap": gap_str,
