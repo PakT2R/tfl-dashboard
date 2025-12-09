@@ -840,13 +840,14 @@ class ACCWebDashboard:
                 # Formatta risultati per visualizzazione
                 st.subheader("⏱️ Time Attack Leaderboard")
 
-                # Determina se la competizione è scaduta (data sistema >= date_end)
+                # Determina se la competizione è scaduta (data sistema >= date_end, usando timezone italiano)
                 from datetime import datetime, timedelta
                 is_expired = False
                 if date_end:
                     try:
                         end_date = datetime.strptime(date_end, '%Y-%m-%d')
-                        is_expired = datetime.now() >= end_date
+                        now_italy = datetime.now(ZoneInfo("Europe/Rome")).replace(tzinfo=None)
+                        is_expired = now_italy >= end_date
                     except:
                         is_expired = False
 
