@@ -840,14 +840,13 @@ class ACCWebDashboard:
                 # Formatta risultati per visualizzazione
                 st.subheader("⏱️ Time Attack Leaderboard")
 
-                # Determina se la competizione è scaduta (data sistema > date_end - 1 giorno)
+                # Determina se la competizione è scaduta (data sistema >= date_end)
                 from datetime import datetime, timedelta
                 is_expired = False
                 if date_end:
                     try:
                         end_date = datetime.strptime(date_end, '%Y-%m-%d')
-                        deadline = end_date - timedelta(days=1)
-                        is_expired = datetime.now() > deadline
+                        is_expired = datetime.now() >= end_date
                     except:
                         is_expired = False
 
@@ -909,8 +908,8 @@ class ACCWebDashboard:
                 display_rows = max(min_rows, num_rows)
                 table_height = (display_rows * row_height) + header_height
 
-                # Applica colore alla colonna Points: rosso se scaduta, verde altrimenti (in grassetto)
-                points_style = 'color: #FF4444; font-weight: bold' if is_expired else 'color: #44BB44; font-weight: bold'
+                # Applica colore alla colonna Points: verde se scaduta (punti definitivi), rosso altrimenti (punti provvisori)
+                points_style = 'color: #44BB44; font-weight: bold' if is_expired else 'color: #FF4444; font-weight: bold'
                 styled_df = df.style.applymap(lambda x: points_style, subset=['Points'])
 
                 st.dataframe(
