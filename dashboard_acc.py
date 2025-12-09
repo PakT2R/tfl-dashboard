@@ -1174,22 +1174,22 @@ class ACCWebDashboard:
 
                     # Seleziona colonne da mostrare nell'ordine richiesto
                     columns_to_show = [
-                        'Pos', 'driver', 'race_points', 'pole_points',
-                        'fastest_lap_points', 'time_attack_points', 'points_bonus', 'points_dropped',
-                        'total_points', 'guests_beaten', 'beaten_by_guests'
+                        'Pos', 'driver', 'total_points', 'time_attack_points', 'race_points', 'pole_points',
+                        'fastest_lap_points', 'points_dropped', 'points_bonus',
+                        'guests_beaten', 'beaten_by_guests'
                     ]
 
                     # Rinomina colonne con i nomi corti
                     column_names = {
                         'Pos': 'Pos',
                         'driver': 'Driver',
+                        'total_points': 'Total Pts',
                         'race_points': 'Race Pts',
                         'pole_points': 'Pole Pts',
                         'fastest_lap_points': 'FLap Pts',
                         'time_attack_points': 'TA Pts',
-                        'points_bonus': 'Bonus Pts',
                         'points_dropped': 'Drop Pts',
-                        'total_points': 'Total Pts',
+                        'points_bonus': 'Bonus G Pts',
                         'guests_beaten': 'G+',
                         'beaten_by_guests': 'G-'
                     }
@@ -1197,8 +1197,14 @@ class ACCWebDashboard:
                     results_display = results_display[columns_to_show]
                     results_display.columns = [column_names[col] for col in columns_to_show]
 
+                    # Applica stile verde e grassetto alla colonna Total Pts
+                    styled_results = results_display.style.applymap(
+                        lambda x: 'color: #44BB44; font-weight: bold',
+                        subset=['Total Pts']
+                    )
+
                     st.dataframe(
-                        results_display,
+                        styled_results,
                         use_container_width=True,
                         hide_index=True,
                         height=35 * min(25, len(results_display)) + 38
