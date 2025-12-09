@@ -931,7 +931,7 @@ class ACCWebDashboard:
 
                 # Prepara dati piloti con scostamento (ordinati dal più veloce al più lento)
                 pilot_data = []
-                for driver, lap_time, split1, split2, split3, points, session_date in ta_results:
+                for driver, lap_time, split1, split2, split3, points, session_date, car_name in ta_results:
                     time_sec = lap_time / 1000
                     deviation = time_sec - avg_time
                     pilot_data.append({'driver': driver, 'deviation': deviation})
