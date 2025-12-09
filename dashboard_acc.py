@@ -397,6 +397,7 @@ class ACCWebDashboard:
                 sr.position,
                 sr.race_number,
                 d.last_name as driver,
+                COALESCE(cm.car_name, sr.car_model) as car,
                 sr.lap_count,
                 sr.best_lap,
                 sr.total_time,
@@ -404,12 +405,13 @@ class ACCWebDashboard:
                 d.trust_level
             FROM session_results sr
             JOIN drivers d ON sr.driver_id = d.driver_id
+            LEFT JOIN car_models cm ON sr.car_model = cm.car_model
             WHERE sr.session_id = ?
             ORDER BY
                 CASE WHEN sr.position IS NULL THEN 1 ELSE 0 END,
                 sr.position
         """
-        
+
         return self.safe_sql_query(query, [session_id])
 
     def format_session_date(self, session_date: str) -> str:
@@ -1267,12 +1269,18 @@ class ACCWebDashboard:
                                 lambda x: "👤" if x > 0 else "👻"
                             )
 
+                            # Formatta colonna Car
+                            session_display['Car'] = session_display['car'].apply(
+                                lambda x: x if pd.notna(x) else "-"
+                            )
+
                             # Seleziona colonne da mostrare (con Type dopo Driver)
-                            columns_to_show = ['Pos', 'race_number', 'driver', 'Type', 'lap_count', 'Best Lap', 'Total Time', 'trust_level']
+                            columns_to_show = ['Pos', 'race_number', 'driver', 'Car', 'Type', 'lap_count', 'Best Lap', 'Total Time', 'trust_level']
                             column_names = {
                                 'Pos': 'Pos',
                                 'race_number': 'Num#',
                                 'driver': 'Driver',
+                                'Car': 'Car',
                                 'Type': 'Type',
                                 'lap_count': 'Laps',
                                 'Best Lap': 'Best Lap',
@@ -1284,7 +1292,7 @@ class ACCWebDashboard:
                             session_display.columns = [column_names[col] for col in columns_to_show]
 
                             # Rimuovi colonna trust_level dalla visualizzazione finale
-                            final_columns = ['Pos', 'Num#', 'Driver', 'Type', 'Laps', 'Best Lap', 'Total Time']
+                            final_columns = ['Pos', 'Num#', 'Driver', 'Car', 'Type', 'Laps', 'Best Lap', 'Total Time']
                             session_display_final = session_display.drop(columns=['trust_level'])
                             session_display_final.columns = final_columns
 
