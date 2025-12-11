@@ -1202,11 +1202,19 @@ class ACCWebDashboard:
                     results_display = results_display[columns_to_show]
                     results_display.columns = [column_names[col] for col in columns_to_show]
 
-                    # Applica stile verde e grassetto alla colonna Total Pts
-                    styled_results = results_display.style.applymap(
-                        lambda x: 'color: #44BB44; font-weight: bold',
-                        subset=['Total Pts']
-                    )
+                    # Applica stile: Total Pts in grassetto e verde, colonne statistiche con sfondo chiaro
+                    def highlight_competition_columns(s):
+                        # Colonne statistiche con sfondo chiaro
+                        stats_cols = ['G+', 'G-']
+                        if s.name in stats_cols:
+                            return ['background-color: #f0f2f6;' for _ in s]
+                        # Total Pts in grassetto e verde
+                        elif s.name == 'Total Pts':
+                            return ['font-weight: bold; color: green;' for _ in s]
+                        else:
+                            return ['' for _ in s]
+
+                    styled_results = results_display.style.apply(highlight_competition_columns, axis=0)
 
                     st.dataframe(
                         styled_results,
@@ -1502,7 +1510,7 @@ class ACCWebDashboard:
 
                     # Rinomina colonne (nell'ordine originale della query)
                     df_display.columns = ['Pos', 'Driver', 'Tier 1 Pts', 'Tier 2 Pts', 'Tier 3 Pts', 'Tier 4 Pts',
-                                         'Total Pts', 'CV%', 'Consist Pts', 'n Tiers', 'n Wins', 'n Pods', 'n Pole', 'n FLap']
+                                         'Total Pts', 'CV%', 'Consist Pts', 'n Tiers', 'n Wins', 'n Pods', 'n Poles', 'n FLaps']
 
                     # Formatta valori numerici: trattini per zeri, decimali per valori > 0
                     df_display['Tier 1 Pts'] = df_display['Tier 1 Pts'].apply(lambda x: f"{x:.1f}" if pd.notna(x) and x > 0 else "-")
@@ -1517,36 +1525,44 @@ class ACCWebDashboard:
                     df_display['n Tiers'] = df_display['n Tiers'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                     df_display['n Wins'] = df_display['n Wins'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                     df_display['n Pods'] = df_display['n Pods'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
-                    df_display['n Pole'] = df_display['n Pole'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
-                    df_display['n FLap'] = df_display['n FLap'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
+                    df_display['n Poles'] = df_display['n Poles'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
+                    df_display['n FLaps'] = df_display['n FLaps'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
 
-                    # Riordina colonne: Pos, Driver, n Tiers, n Wins, n Pods, n Pole, n FLap, Tier 1-4, CV%, Consist, Total
-                    column_order = ['Pos', 'Driver', 'n Tiers', 'n Wins', 'n Pods', 'n Pole', 'n FLap',
-                                   'Tier 1 Pts', 'Tier 2 Pts', 'Tier 3 Pts', 'Tier 4 Pts', 'CV%', 'Consist Pts', 'Total Pts']
+                    # Riordina colonne: Pos, Driver, Total Pts, Tier 1-4, CV%, Consist, n Tiers, n Wins, n Pods, n Poles, n FLaps
+                    column_order = ['Pos', 'Driver', 'Total Pts', 'Tier 1 Pts', 'Tier 2 Pts', 'Tier 3 Pts', 'Tier 4 Pts',
+                                   'CV%', 'Consist Pts', 'n Tiers', 'n Wins', 'n Pods', 'n Poles', 'n FLaps']
                     df_display = df_display[column_order]
 
-                    # Applica stile: Total Pts in grassetto e verde
-                    def highlight_total_league(s):
-                        return ['font-weight: bold; color: green;' if s.name == 'Total Pts' else '' for _ in s]
+                    # Applica stile: Total Pts in grassetto e verde, colonne statistiche con sfondo chiaro
+                    def highlight_league_columns(s):
+                        # Colonne statistiche con sfondo chiaro (incluso CV%)
+                        stats_cols = ['CV%', 'n Tiers', 'n Wins', 'n Pods', 'n Poles', 'n FLaps']
+                        if s.name in stats_cols:
+                            return ['background-color: #f0f2f6;' for _ in s]
+                        # Total Pts in grassetto e verde
+                        elif s.name == 'Total Pts':
+                            return ['font-weight: bold; color: green;' for _ in s]
+                        else:
+                            return ['' for _ in s]
 
-                    styled_league = df_display.style.apply(highlight_total_league, axis=0)
+                    styled_league = df_display.style.apply(highlight_league_columns, axis=0)
 
                     # Configura larghezza colonne (in pixel)
                     column_config = {
                         'Pos': st.column_config.TextColumn('Pos', width=60),
                         'Driver': st.column_config.TextColumn('Driver', width=150),
-                        'n Tiers': st.column_config.TextColumn('n Tiers', width=70),
-                        'n Wins': st.column_config.TextColumn('n Wins', width=70),
-                        'n Pods': st.column_config.TextColumn('n Pods', width=70),
-                        'n Pole': st.column_config.TextColumn('n Pole', width=70),
-                        'n FLap': st.column_config.TextColumn('n FLap', width=70),
+                        'Total Pts': st.column_config.TextColumn('Total Pts', width=80),
                         'Tier 1 Pts': st.column_config.TextColumn('Tier 1 Pts', width=80),
                         'Tier 2 Pts': st.column_config.TextColumn('Tier 2 Pts', width=80),
                         'Tier 3 Pts': st.column_config.TextColumn('Tier 3 Pts', width=80),
                         'Tier 4 Pts': st.column_config.TextColumn('Tier 4 Pts', width=80),
                         'CV%': st.column_config.TextColumn('CV%', width=70),
                         'Consist Pts': st.column_config.TextColumn('Consist Pts', width=90),
-                        'Total Pts': st.column_config.TextColumn('Total Pts', width=80)
+                        'n Tiers': st.column_config.TextColumn('n Tiers', width=70),
+                        'n Wins': st.column_config.TextColumn('n Wins', width=70),
+                        'n Pods': st.column_config.TextColumn('n Pods', width=70),
+                        'n Poles': st.column_config.TextColumn('n Poles', width=70),
+                        'n FLaps': st.column_config.TextColumn('n FLaps', width=70)
                     }
 
                     # Mostra tabella
@@ -1703,63 +1719,61 @@ class ACCWebDashboard:
                                 standings_display['poles'] = standings_display['poles'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                                 standings_display['fastest_laps'] = standings_display['fastest_laps'].apply(lambda x: str(int(x)) if pd.notna(x) and x > 0 else "-")
                                 standings_display['gross_points'] = standings_display['gross_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
-                                standings_display['base_points'] = standings_display['base_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
-                                standings_display['participation_multiplier'] = standings_display['participation_multiplier'].apply(lambda x: f"{x:.2f}" if pd.notna(x) and x != 1.0 else "-")
-                                standings_display['participation_bonus'] = standings_display['participation_bonus'].apply(lambda x: f"+{x:.1f}" if pd.notna(x) and x > 0 else "-")
                                 standings_display['manual_penalties'] = standings_display['manual_penalties'].apply(lambda x: f"-{x:.0f}" if pd.notna(x) and x > 0 else "-")
                                 standings_display['total_points'] = standings_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
 
-                                # Seleziona colonne da mostrare nell'ordine richiesto: Pos, Driver, Races, Wins, Pods, Pole, FL, Gross, Drop, Base, Mult, Bonus, Pen, Total
+                                # Seleziona colonne da mostrare nell'ordine richiesto: Pos, Driver, Total, Gross, Drop, Pen | n Races, n Wins, n Pods, n Poles, n FLaps
                                 columns_to_show = [
-                                    'Pos', 'driver', 'competitions_participated', 'wins', 'podiums',
-                                    'poles', 'fastest_laps', 'gross_points', 'points_dropped',
-                                    'base_points', 'participation_multiplier', 'participation_bonus',
-                                    'manual_penalties', 'total_points'
+                                    'Pos', 'driver', 'total_points', 'gross_points', 'points_dropped',
+                                    'manual_penalties', 'competitions_participated', 'wins', 'podiums',
+                                    'poles', 'fastest_laps'
                                 ]
 
                                 # Rinomina colonne con i nomi corti
                                 column_names = {
                                     'Pos': 'Pos',
                                     'driver': 'Driver',
-                                    'competitions_participated': 'Races',
-                                    'wins': 'Wins',
-                                    'podiums': 'Pods',
-                                    'poles': 'Pole',
-                                    'fastest_laps': 'FL',
+                                    'total_points': 'Total Pts',
                                     'gross_points': 'Gross Pts',
                                     'points_dropped': 'Drop Pts',
-                                    'base_points': 'Base Pts',
-                                    'participation_multiplier': 'Mult',
-                                    'participation_bonus': 'Bonus Pts',
                                     'manual_penalties': 'Pen Pts',
-                                    'total_points': 'Total Pts'
+                                    'competitions_participated': 'n Races',
+                                    'wins': 'n Wins',
+                                    'podiums': 'n Pods',
+                                    'poles': 'n Poles',
+                                    'fastest_laps': 'n FLaps'
                                 }
 
                                 standings_display = standings_display[columns_to_show]
                                 standings_display.columns = [column_names[col] for col in columns_to_show]
 
-                                # Applica stile: Total Pts in grassetto e verde
-                                def highlight_total_champ(s):
-                                    return ['font-weight: bold; color: green;' if s.name == 'Total Pts' else '' for _ in s]
+                                # Applica stile: Total Pts in grassetto e verde, colonne statistiche con sfondo chiaro
+                                def highlight_columns(s):
+                                    # Colonne statistiche con sfondo chiaro
+                                    stats_cols = ['n Races', 'n Wins', 'n Pods', 'n Poles', 'n FLaps']
+                                    if s.name in stats_cols:
+                                        return ['background-color: #f0f2f6;' for _ in s]
+                                    # Total Pts in grassetto e verde
+                                    elif s.name == 'Total Pts':
+                                        return ['font-weight: bold; color: green;' for _ in s]
+                                    else:
+                                        return ['' for _ in s]
 
-                                styled_standings = standings_display.style.apply(highlight_total_champ, axis=0)
+                                styled_standings = standings_display.style.apply(highlight_columns, axis=0)
 
                                 # Configura larghezza colonne (in pixel)
                                 column_config = {
                                     'Pos': st.column_config.TextColumn('Pos', width=60),
                                     'Driver': st.column_config.TextColumn('Driver', width=150),
-                                    'Races': st.column_config.TextColumn('Races', width=70),
-                                    'Wins': st.column_config.TextColumn('Wins', width=60),
-                                    'Pods': st.column_config.TextColumn('Pods', width=60),
-                                    'Pole': st.column_config.TextColumn('Pole', width=60),
-                                    'FL': st.column_config.TextColumn('FL', width=50),
+                                    'Total Pts': st.column_config.TextColumn('Total Pts', width=80),
                                     'Gross Pts': st.column_config.TextColumn('Gross Pts', width=80),
                                     'Drop Pts': st.column_config.TextColumn('Drop Pts', width=70),
-                                    'Base Pts': st.column_config.TextColumn('Base Pts', width=80),
-                                    'Mult': st.column_config.TextColumn('Mult', width=60),
-                                    'Bonus Pts': st.column_config.TextColumn('Bonus Pts', width=80),
                                     'Pen Pts': st.column_config.TextColumn('Pen Pts', width=70),
-                                    'Total Pts': st.column_config.TextColumn('Total Pts', width=80)
+                                    'n Races': st.column_config.TextColumn('n Races', width=70),
+                                    'n Wins': st.column_config.TextColumn('n Wins', width=60),
+                                    'n Pods': st.column_config.TextColumn('n Pods', width=60),
+                                    'n Poles': st.column_config.TextColumn('n Poles', width=70),
+                                    'n FLaps': st.column_config.TextColumn('n FLaps', width=70)
                                 }
 
                                 # Mostra tabella senza indice e con altezza dinamica
