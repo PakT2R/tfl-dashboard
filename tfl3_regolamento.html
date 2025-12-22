@@ -454,27 +454,29 @@ TIER 4 → Settimane 13-16 (4 gare ufficiali)
     </div>
     
     <h3>Bonus Consistenza (Fine Stagione)</h3>
-    <p>Premia chi mantiene <strong>performance stabili</strong> attraverso TUTTI i 4 TIER.</p>
-    
+    <p>Premia chi mantiene <strong>posizioni stabili</strong> attraverso TUTTI i 4 TIER.</p>
+
     <div class="formula">
-        Bonus Consistenza = Punteggio_Base × (0.10 - CV) × 0.8<br>
-        Con limiti: MIN 0 punti, MAX 100 punti
+        Bonus Consistenza = Punteggio_Base × (0.10 - CV) × 0.8
     </div>
-    
+
     <p><strong>Dove:</strong></p>
     <ul>
         <li><strong>Punteggio_Base</strong> = Somma dei 4 TIER (senza bonus)</li>
-        <li><strong>CV</strong> (Coefficiente di Variazione) = Deviazione Standard / Media dei TIER</li>
-        <li>Misura quanto sono variabili i tuoi punteggi tra i TIER</li>
+        <li><strong>CV</strong> (Coefficiente di Variazione) = Deviazione Standard / Media delle POSIZIONI nei TIER</li>
+        <li>Misura quanto variano le tue <strong>posizioni</strong> in classifica tra i TIER</li>
         <li><strong>0.10</strong> = Soglia massima (10% di variabilità)</li>
         <li><strong>0.8</strong> = Fattore moltiplicativo</li>
     </ul>
-    
+
     <p><strong>Come Funziona:</strong></p>
     <ul>
-        <li><span class="check">✅</span> <strong>Se CV &lt; 10%</strong> → Ricevi bonus (più sei costante, più il bonus è alto)</li>
-        <li><span class="cross">❌</span> <strong>Se CV ≥ 10%</strong> → Nessun bonus (troppa variabilità)</li>
+        <li><span class="check">✅</span> <strong>Se CV &lt; 10%</strong> → Ricevi bonus (più mantieni la stessa posizione, più il bonus è alto)</li>
+        <li><span class="cross">❌</span> <strong>Se CV ≥ 10%</strong> → Nessun bonus (troppa variabilità nelle posizioni)</li>
     </ul>
+
+    <p><strong>Perché le posizioni invece dei punteggi?</strong><br>
+    I punteggi TIER possono variare per fattori esterni (numero di guest partecipanti), mentre le posizioni in classifica rimangono stabili e rappresentano meglio la consistenza relativa tra i membri registrati.</p>
     
     <table>
         <tr>
@@ -515,41 +517,60 @@ TIER 4 → Settimane 13-16 (4 gare ufficiali)
     </table>
     
     <h3>Esempi Pratici</h3>
-    
+
     <div class="example">
         <strong>Driver A - Super Costante:</strong>
         <ul>
-            <li>TIER: 54.0, 55.2, 53.5, 54.8</li>
-            <li>Media: 54.4</li>
-            <li>CV: 0.8% (molto bassa!)</li>
+            <li>Posizioni TIER: 3°, 3°, 3°, 3° (stessa posizione sempre!)</li>
+            <li>Punteggi TIER: 54.0, 55.2, 53.5, 54.8 punti</li>
+            <li>Media posizioni: 3.0</li>
+            <li>Deviazione standard: 0.0</li>
+            <li>CV: 0.0% (perfetto!)</li>
             <li>Punteggio Base: 217.5</li>
-            <li><strong>Bonus: 217.5 × (0.10 - 0.008) × 0.8 = 16 punti</strong> ✅</li>
+            <li><strong>Bonus: 217.5 × (0.10 - 0.00) × 0.8 = 17.4 punti</strong> ✅</li>
         </ul>
     </div>
-    
+
     <div class="example">
         <strong>Driver B - Costante:</strong>
         <ul>
-            <li>TIER: 53.0, 49.5, 55.0, 52.0</li>
-            <li>Media: 52.4</li>
-            <li>CV: 4.5%</li>
+            <li>Posizioni TIER: 2°, 4°, 3°, 3°</li>
+            <li>Punteggi TIER: 53.0, 49.5, 55.0, 52.0 punti</li>
+            <li>Media posizioni: 3.0</li>
+            <li>Deviazione standard: 0.71</li>
+            <li>CV: 23.5% (variazione posizione discreta)</li>
             <li>Punteggio Base: 209.5</li>
-            <li><strong>Bonus: 209.5 × (0.10 - 0.045) × 0.8 = 9 punti</strong> ✅</li>
+            <li><strong>Bonus: 0 punti</strong> ❌ (CV oltre il 10%)</li>
         </ul>
     </div>
-    
+
     <div class="example">
         <strong>Driver C - Altalenante:</strong>
         <ul>
-            <li>TIER: 61.0, 27.0, 56.0, 31.0</li>
-            <li>Media: 43.8</li>
-            <li>CV: 35.8% (troppo alta!)</li>
+            <li>Posizioni TIER: 1°, 8°, 2°, 9° (molto variabili!)</li>
+            <li>Punteggi TIER: 61.0, 27.0, 56.0, 31.0 punti</li>
+            <li>Media posizioni: 5.0</li>
+            <li>Deviazione standard: 3.74</li>
+            <li>CV: 74.8% (troppo alta!)</li>
             <li>Punteggio Base: 175.0</li>
             <li><strong>Bonus: 0 punti</strong> ❌ (CV oltre il 10%)</li>
         </ul>
     </div>
-    
-    <p><strong>Obiettivo:</strong> Premiare chi mantiene rendimento stabile per tutta la stagione, non solo picchi di performance in singoli TIER.</p>
+
+    <div class="example">
+        <strong>Driver D - Buona Consistenza:</strong>
+        <ul>
+            <li>Posizioni TIER: 5°, 5°, 6°, 5°</li>
+            <li>Punteggi TIER: 42.0, 45.5, 41.0, 44.0 punti</li>
+            <li>Media posizioni: 5.25</li>
+            <li>Deviazione standard: 0.43</li>
+            <li>CV: 8.2%</li>
+            <li>Punteggio Base: 172.5</li>
+            <li><strong>Bonus: 172.5 × (0.10 - 0.082) × 0.8 = 2.5 punti</strong> ✅</li>
+        </ul>
+    </div>
+
+    <p><strong>Obiettivo:</strong> Premiare chi mantiene <strong>posizioni stabili</strong> per tutta la stagione, indipendentemente dai punteggi assoluti.</p>
     
     <h3>Classifica Finale</h3>
     <div class="formula">
@@ -604,25 +625,25 @@ TIER 4 → Settimane 13-16 (4 gare ufficiali)
     
     <div class="highlight-box">
         <p><strong>Punteggio Base:</strong> 56.2 + 53.4 + 57.8 + 55.5 = <strong>222.9 pt</strong></p>
-        
-        <p><strong>Analisi Consistenza:</strong></p>
+
+        <p><strong>Analisi Consistenza (basata su posizioni):</strong></p>
         <ul>
-            <li>Scores TIER: 56.2, 53.4, 57.8, 55.5</li>
-            <li>Media: 55.7</li>
-            <li>Deviazione Standard: 1.8</li>
-            <li>CV: 1.8 / 55.7 = 0.032 (3.2%)</li>
+            <li>Posizioni TIER: 3°, 4°, 3°, 3° (Marco si è mantenuto stabile!)</li>
+            <li>Punteggi TIER: 56.2, 53.4, 57.8, 55.5 pt</li>
+            <li>Media posizioni: 3.25</li>
+            <li>Deviazione Standard posizioni: 0.43</li>
+            <li>CV: 0.43 / 3.25 = 0.132 (13.2%)</li>
         </ul>
-        
+
         <p><strong>Calcolo Bonus:</strong></p>
         <ul>
-            <li>Bonus = 222.9 × (0.10 - 0.032) × 0.8</li>
-            <li>Bonus = 222.9 × 0.068 × 0.8</li>
-            <li><strong>Bonus Consistenza: 12 pt</strong></li>
+            <li>CV = 13.2% → Oltre la soglia del 10%</li>
+            <li><strong>Bonus Consistenza: 0 pt</strong> ❌</li>
         </ul>
     </div>
     
     <div class="formula" style="font-size: 20px;">
-        🏆 PUNTEGGIO FINALE: 222.9 + 12 = 235 punti
+        🏆 PUNTEGGIO FINALE: 222.9 + 0 = 222.9 punti
     </div>
 
     <h2>❓ FAQ</h2>
@@ -649,7 +670,7 @@ TIER 4 → Settimane 13-16 (4 gare ufficiali)
     No, il bonus +1 punto giro veloce è riservato ai membri registrati e vale solo per il giro fatto IN GARA (non conta il Time Attack).</p>
     
     <p><strong>Q: Come si calcola il bonus consistenza?</strong><br>
-    Si analizza quanto sono variabili i tuoi 4 punteggi TIER. Se hai un CV (variabilità) sotto il 10%, ricevi un bonus proporzionale. Più sei costante, più alto è il bonus (max 100 punti).</p>
+    Si analizza quanto sono variabili le tue 4 posizioni nei TIER. Se hai un CV (variabilità delle posizioni) sotto il 10%, ricevi un bonus proporzionale al tuo punteggio base. Più mantieni la stessa posizione attraverso i TIER, più alto è il bonus.</p>
     
     <p><strong>Q: Conviene fare Time Attack tutte le settimane?</strong><br>
     Assolutamente sì! I punti TA si sommano sempre ai punti gara. Anche se arrivi ultimo in gara, un buon tempo TA può ribaltare la classifica.</p>
