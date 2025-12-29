@@ -1282,12 +1282,12 @@ class ACCWebDashboard:
                                 lambda x: x if pd.notna(x) else "-"
                             )
 
-                            # Seleziona colonne da mostrare (con Type dopo Driver)
-                            columns_to_show = ['Pos', 'race_number', 'driver', 'Car', 'Type', 'lap_count', 'Best Lap', 'Total Time', 'trust_level']
+                            # Seleziona colonne da mostrare (Driver prima di Num#)
+                            columns_to_show = ['Pos', 'driver', 'race_number', 'Car', 'Type', 'lap_count', 'Best Lap', 'Total Time', 'trust_level']
                             column_names = {
                                 'Pos': 'Pos',
-                                'race_number': 'Num#',
                                 'driver': 'Driver',
+                                'race_number': 'Num#',
                                 'Car': 'Car',
                                 'Type': 'Type',
                                 'lap_count': 'Laps',
@@ -1300,15 +1300,22 @@ class ACCWebDashboard:
                             session_display.columns = [column_names[col] for col in columns_to_show]
 
                             # Rimuovi colonna trust_level dalla visualizzazione finale
-                            final_columns = ['Pos', 'Num#', 'Driver', 'Car', 'Type', 'Laps', 'Best Lap', 'Total Time']
+                            final_columns = ['Pos', 'Driver', 'Num#', 'Car', 'Type', 'Laps', 'Best Lap', 'Total Time']
                             session_display_final = session_display.drop(columns=['trust_level'])
                             session_display_final.columns = final_columns
 
+                            # Configurazione larghezza colonne: colonne strette per Pos, Num#, Type, Laps
                             st.dataframe(
                                 session_display_final,
                                 use_container_width=True,
                                 hide_index=True,
-                                height=35 * min(25, len(session_display_final)) + 38
+                                height=35 * min(25, len(session_display_final)) + 38,
+                                column_config={
+                                    "Pos": st.column_config.TextColumn("Pos", width="small"),
+                                    "Num#": st.column_config.TextColumn("Num#", width="small"),
+                                    "Type": st.column_config.TextColumn("Type", width="small"),
+                                    "Laps": st.column_config.TextColumn("Laps", width="small")
+                                }
                             )
                         else:
                             st.warning(f"⚠️ No results found for {session_type}")
