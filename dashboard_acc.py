@@ -1722,7 +1722,7 @@ class ACCWebDashboard:
                                 standings_display['manual_penalties'] = standings_display['manual_penalties'].apply(lambda x: f"-{x:.0f}" if pd.notna(x) and x > 0 else "-")
                                 standings_display['total_points'] = standings_display['total_points'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "0.0")
 
-                                # Seleziona colonne da mostrare nell'ordine richiesto: Pos, Driver, Total, Gross, Drop, Pen | n Races, n Wins, n Pods, n Poles, n FLaps
+                                # Seleziona colonne da mostrare nell'ordine richiesto: Pos, Driver, Total, Gross, Drop, Pen | n Comps, n Wins, n Pods, n Poles, n FLaps
                                 columns_to_show = [
                                     'Pos', 'driver', 'total_points', 'gross_points', 'points_dropped',
                                     'manual_penalties', 'competitions_participated', 'wins', 'podiums',
@@ -1737,7 +1737,7 @@ class ACCWebDashboard:
                                     'gross_points': 'Gross Pts',
                                     'points_dropped': 'Drop Pts',
                                     'manual_penalties': 'Pen Pts',
-                                    'competitions_participated': 'n Races',
+                                    'competitions_participated': 'n Comps',
                                     'wins': 'n Wins',
                                     'podiums': 'n Pods',
                                     'poles': 'n Poles',
@@ -1750,7 +1750,7 @@ class ACCWebDashboard:
                                 # Applica stile: Total Pts in grassetto e verde, colonne statistiche con sfondo chiaro
                                 def highlight_columns(s):
                                     # Colonne statistiche con sfondo chiaro
-                                    stats_cols = ['n Races', 'n Wins', 'n Pods', 'n Poles', 'n FLaps']
+                                    stats_cols = ['n Comps', 'n Wins', 'n Pods', 'n Poles', 'n FLaps']
                                     if s.name in stats_cols:
                                         return ['background-color: #f0f2f6;' for _ in s]
                                     # Total Pts in grassetto e verde
@@ -1769,7 +1769,7 @@ class ACCWebDashboard:
                                     'Gross Pts': st.column_config.TextColumn('Gross Pts', width=80),
                                     'Drop Pts': st.column_config.TextColumn('Drop Pts', width=70),
                                     'Pen Pts': st.column_config.TextColumn('Pen Pts', width=70),
-                                    'n Races': st.column_config.TextColumn('n Races', width=70),
+                                    'n Comps': st.column_config.TextColumn('n Comps', width=70),
                                     'n Wins': st.column_config.TextColumn('n Wins', width=60),
                                     'n Pods': st.column_config.TextColumn('n Pods', width=60),
                                     'n Poles': st.column_config.TextColumn('n Poles', width=70),
